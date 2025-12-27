@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"io"
-	"time"
+	"os"
+	"strconv"
+	"strings"
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
@@ -34,9 +37,8 @@ func (client *Client) CreateUser(name string) (*db.User, error) {
 	createUsrReq := &db.CreateUserRequest{Name: name}
 
 	createUsrResp, err := client.msgBoardClient.CreateUser(context.Background(), createUsrReq)
-	fmt.Printf("[INFO]: sent a create user request\n")
 	checkError(err)
-	fmt.Printf("[INFO]: recived user ID request %d\n", createUsrResp.Id)
+	client.id = createUsrResp.Id
 
 	return createUsrResp, nil
 
@@ -47,8 +49,8 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 	newTopicReq := &db.CreateTopicRequest{Name: name}
 
 	createTopicResp, err := client.msgBoardClient.CreateTopic(context.Background(), newTopicReq)
-	fmt.Printf("[INFO] sent a create topic request\n")
 	checkError(err)
+	fmt.Printf("Topic: %s created\n", createTopicResp.Name)
 
 	return createTopicResp, nil
 }
@@ -58,8 +60,9 @@ func (client *Client) PostMessage(topicID, userID int64, text string) (*db.Messa
 	newPostReq := &db.PostMessageRequest{TopicId: topicID, UserId: userID, Text: text}
 
 	PostResp, err := client.msgBoardClient.PostMessage(context.Background(), newPostReq)
-	fmt.Printf("[INFO] sent a post message request\n")
 	checkError(err)
+
+	fmt.Printf("Post created: %s\n", PostResp.Text)
 
 	return PostResp, nil
 }
@@ -69,7 +72,6 @@ func (client *Client) LikeMessage(topicID, messageID, userID int64) (*db.Message
 	newLikeReq := &db.LikeMessageRequest{TopicId: topicID, MessageId: messageID, UserId: userID}
 
 	LikeResp, err := client.msgBoardClient.LikeMessage(context.Background(), newLikeReq)
-	fmt.Printf("[INFO] sent a like message request\n")
 	checkError(err)
 
 	return LikeResp, nil
@@ -80,7 +82,6 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 	subNodeReq := &db.SubscriptionNodeRequest{UserId: userID, TopicId: topicIDs}
 
 	SubNodeResp, err := client.msgBoardClient.GetSubscriptionNode(context.Background(), subNodeReq)
-	fmt.Printf("[INFO] sent a get subscription node request\n")
 	checkError(err)
 
 	return SubNodeResp, nil
@@ -91,8 +92,11 @@ func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
 	listTopicsReq := &emptypb.Empty{}
 
 	listTopicsRes, err := client.msgBoardClient.ListTopics(context.Background(), listTopicsReq)
-	fmt.Printf("[INFO] sent a list topics request\n")
 	checkError(err)
+
+	for i := 0; i < len(listTopicsRes.Topics); i++ {
+		fmt.Printf("Topic %s id: %d\n", listTopicsRes.Topics[i].Name, listTopicsRes.Topics[i].Id)
+	}
 
 	return listTopicsRes, nil
 }
@@ -102,7 +106,6 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 	getMsgReq := &db.GetMessagesRequest{TopicId: topicID, FromMessageId: fromMessageID, Limit: limit}
 
 	msgResp, err := client.msgBoardClient.GetMessages(context.Background(), getMsgReq)
-	fmt.Printf("[INFO] sent a get messages request\n")
 	checkError(err)
 
 	return msgResp, nil
@@ -112,7 +115,6 @@ func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.S
 	defer close(msgEvents)
 
 	msgStream, err := client.msgBoardClient.SubscribeTopic(context.Background(), req)
-	fmt.Printf("[INFO] sent a subscribe topic request\n")
 	checkError(err)
 
 	for {
@@ -145,7 +147,6 @@ func (client *Client) GetClusterState() (*db.GetClusterStateResponse, error) {
 	clusterStateReq := &emptypb.Empty{}
 
 	clusterStateRes, err := client.controlClient.GetClusterState(context.Background(), clusterStateReq)
-	fmt.Printf("[INFO] sent a get cluster state request\n")
 	checkError(err)
 
 	return clusterStateRes, nil
@@ -164,11 +165,60 @@ func startClient(url string, name string) error {
 	client.name = name
 	client.CreateUser(name)
 
-	for {
-		time.Sleep(time.Second)
-	}
+	fmt.Printf("Welcome to razpravljalnica\n")
 
-	return nil
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Printf("$razpravljalnica@%s: ", client.name)
+
+		input, _ := reader.ReadString('\n')
+		input = input[:len(input)-1]
+		args := strings.Split(input, " ")
+
+		switch args[0] {
+		case "newTopic":
+			if len(args) != 2 {
+
+				fmt.Printf("Wrong number of arguments use help to see the list of commands")
+			} else {
+
+				client.CreateTopic(args[1])
+			}
+		case "post":
+			if len(args) < 3 {
+
+				fmt.Printf("Wrong number of arguments use help to see the list of commands")
+			} else {
+
+				val, err := strconv.Atoi(args[1])
+				if err != nil {
+
+					fmt.Printf("Invalid id for topic")
+				} else {
+
+					postText := ""
+					for i := 2; i < len(args); i++ {
+						postText += " "
+						postText += args[i]
+					}
+
+					client.PostMessage(int64(val), client.id, postText)
+
+				}
+
+			}
+
+		case "list":
+
+			client.ListTopics()
+
+		case "exit":
+			return nil
+		default:
+			fmt.Printf("Temp help msg")
+		}
+	}
 }
 
 func main() {

@@ -17,12 +17,20 @@ import (
 type Server struct {
 	db.UnimplementedMessageBoardServer
 	CRUDServer *ServerDataBase
-	dbLock     sync.Mutex
 }
 
 type ServerDataBase struct {
 	users     map[string]int64
 	userIndex int64
+	userLock  sync.Mutex
+
+	topics     map[string]int64
+	topicIndex int64
+	topicLock  sync.Mutex
+
+	topicsPosts map[int64]map[int64]db.Message
+	postIndex   int64
+	postLock    sync.Mutex
 }
 
 func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest) (*db.User, error) {
@@ -42,13 +50,13 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 
 		fmt.Printf("[INFO]: Creating user with ID %d\n", server.CRUDServer.userIndex)
 
-		server.dbLock.Lock()
+		server.CRUDServer.userLock.Lock()
 
 		server.CRUDServer.users[req.Name] = server.CRUDServer.userIndex
 		currUser.Id = server.CRUDServer.userIndex
 		server.CRUDServer.userIndex++
 
-		server.dbLock.Unlock()
+		server.CRUDServer.userLock.Unlock()
 
 	}
 
@@ -56,11 +64,56 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 }
 
 func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicRequest) (*db.Topic, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateTopic not implemented")
+
+	fmt.Printf("[INFO]: Recieved create topic request: %s\n", req.Name)
+
+	newTopic := db.Topic{}
+	newTopic.Name = req.Name
+
+	topicId, topicExists := server.CRUDServer.topics[req.Name]
+
+	if topicExists {
+
+		fmt.Printf("[INFO]: Topic exists returning topic ID %d\n", topicId)
+		newTopic.Id = topicId
+	} else {
+
+		fmt.Printf("[INFO]: Creating topic with ID %d\n", server.CRUDServer.topicIndex)
+
+		server.CRUDServer.topicLock.Lock()
+
+		server.CRUDServer.topics[req.Name] = server.CRUDServer.topicIndex
+		server.CRUDServer.topicsPosts[server.CRUDServer.topicIndex] = make(map[int64]db.Message)
+		newTopic.Id = server.CRUDServer.topicIndex
+		server.CRUDServer.topicIndex++
+
+		server.CRUDServer.topicLock.Unlock()
+
+	}
+
+	return &newTopic, nil
 }
 
 func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageRequest) (*db.Message, error) {
-	return nil, status.Error(codes.Unimplemented, "method PostMessage not implemented")
+
+	fmt.Printf("[INFO]: Recieved create post request\n")
+
+	newPost := db.Message{}
+	newPost.Text = req.Text
+	newPost.UserId = req.UserId
+	newPost.TopicId = req.TopicId
+	newPost.Likes = 0
+
+	server.CRUDServer.postLock.Lock()
+
+	newPost.Id = server.CRUDServer.postIndex
+	server.CRUDServer.topicsPosts[req.TopicId][server.CRUDServer.postIndex] = newPost
+
+	server.CRUDServer.postIndex++
+
+	server.CRUDServer.postLock.Unlock()
+
+	return &newPost, nil
 }
 
 func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageRequest) (*db.Message, error) {
@@ -72,7 +125,17 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 }
 
 func (server *Server) ListTopics(ctx context.Context, req *emptypb.Empty) (*db.ListTopicsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListTopics not implemented")
+
+	fmt.Printf("[INFO]: Recieved list topics request\n")
+
+	topicList := db.ListTopicsResponse{}
+	topicList.Topics = make([]*db.Topic, 0, len(server.CRUDServer.topics))
+
+	for key, val := range server.CRUDServer.topics {
+		topicList.Topics = append(topicList.Topics, &db.Topic{Id: val, Name: key})
+	}
+
+	return &topicList, nil
 }
 
 func (server *Server) GetMessages(ctx context.Context, req *db.GetMessagesRequest) (*db.GetMessagesResponse, error) {
@@ -96,6 +159,12 @@ func startServer(url string) {
 	CRUD := ServerDataBase{}
 	CRUD.users = make(map[string]int64)
 	CRUD.userIndex = 0
+
+	CRUD.topics = make(map[string]int64)
+	CRUD.topicIndex = 0
+
+	CRUD.topicsPosts = make(map[int64]map[int64]db.Message)
+	CRUD.postIndex = 0
 
 	fmt.Printf("Server starting: %s\n", url)
 	grpcServer := grpc.NewServer()
