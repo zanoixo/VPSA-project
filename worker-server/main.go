@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -18,6 +20,8 @@ import (
 type Server struct {
 	db.UnimplementedMessageBoardServer
 	CRUDServer *ServerDataBase
+	url        string
+	nodeId     string
 }
 
 type ServerDataBase struct {
@@ -36,6 +40,9 @@ type ServerDataBase struct {
 
 	userLikes map[int64][]int64 //map[userId]array[messegeIds]
 	likesLock sync.Mutex
+
+	userSubscription     map[string][]int64
+	userSubscriptionLock sync.Mutex
 }
 
 func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest) (*db.User, error) {
@@ -169,7 +176,33 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 }
 
 func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetSubscriptionNode not implemented")
+
+	subNode := &db.NodeInfo{}
+	subNode.NodeId = server.nodeId
+	subNode.Address = server.url
+
+	user := ""
+
+	for username, id := range server.CRUDServer.users {
+
+		if id == req.UserId {
+			user = username
+		}
+	}
+
+	if user == "" {
+		return nil, status.Error(codes.NotFound, "User doesnt exist")
+	}
+
+	userToken := sha256.Sum256([]byte(user))
+
+	subToken := hex.EncodeToString(userToken[:])
+
+	server.CRUDServer.userSubscription[subToken] = req.TopicId
+
+	subResp := &db.SubscriptionNodeResponse{Node: subNode, SubscribeToken: subToken}
+
+	return subResp, nil
 }
 
 func (server *Server) ListTopics(ctx context.Context, req *emptypb.Empty) (*db.ListTopicsResponse, error) {
@@ -237,7 +270,7 @@ func checkError(err error) {
 
 }
 
-func startServer(url string) {
+func startServer(url string, nodeId string) {
 
 	CRUD := ServerDataBase{}
 	CRUD.users = make(map[string]int64)
@@ -252,11 +285,15 @@ func startServer(url string) {
 
 	CRUD.userLikes = make(map[int64][]int64)
 
+	CRUD.userSubscription = make(map[string][]int64)
+
 	fmt.Printf("Server starting: %s\n", url)
 	grpcServer := grpc.NewServer()
 
 	server := Server{}
 	server.CRUDServer = &CRUD
+	server.url = url
+	server.nodeId = nodeId
 
 	db.RegisterMessageBoardServer(grpcServer, &server)
 
@@ -272,9 +309,10 @@ func main() {
 
 	iPtr := flag.String("ip", "localhost", "server IP")
 	pPtr := flag.Int("p", 6000, "server port")
+	nPtr := flag.String("n", "0", "Node id")
 	flag.Parse()
 
 	url := fmt.Sprintf("%v:%v", *iPtr, *pPtr)
 
-	startServer(url)
+	startServer(url, *nPtr)
 }

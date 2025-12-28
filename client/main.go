@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,9 @@ type Client struct {
 	id              int64
 	otherUsers      map[int64]string
 	availableTopics map[string]int64
+	subToken        string
+	subNode         *db.NodeInfo
+	subTopics       []int64
 }
 
 func (client *Client) CreateUser(name string) (*db.User, error) {
@@ -96,7 +100,12 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 	subNodeReq := &db.SubscriptionNodeRequest{UserId: userID, TopicId: topicIDs}
 
 	SubNodeResp, err := client.msgBoardClient.GetSubscriptionNode(context.Background(), subNodeReq)
-	checkError(err)
+
+	if !checkError(err) {
+
+		client.subToken = SubNodeResp.SubscribeToken
+		client.subNode = SubNodeResp.Node
+	}
 
 	return SubNodeResp, nil
 }
@@ -172,6 +181,17 @@ func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.S
 
 func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int64, token string) (<-chan *db.MessageEvent, error) {
 
+	for _, topic := range topicIDs {
+
+		if !slices.Contains(client.subTopics, topic) {
+
+			client.subTopics = append(client.subTopics, topic)
+		}
+
+	}
+
+	client.GetSubscriptionNode(client.id, client.subTopics)
+
 	msgEvents := make(chan *db.MessageEvent)
 
 	subTopicReq := &db.SubscribeTopicRequest{TopicId: topicIDs, UserId: userID, FromMessageId: fromMessageID, SubscribeToken: token}
@@ -221,6 +241,7 @@ func startClient(url string, name string) error {
 	client.name = name
 	client.otherUsers = make(map[int64]string)
 	client.availableTopics = make(map[string]int64)
+	client.subTopics = make([]int64, 10)
 	client.CreateUser(name)
 	client.GetUsers()
 
@@ -312,6 +333,37 @@ func startClient(url string, name string) error {
 		case "getUsers":
 			client.GetUsers()
 
+		case "sub":
+
+			if len(args) != 3 {
+
+				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
+			} else {
+
+				fromMsgId, err := strconv.Atoi(args[1])
+
+				if err != nil {
+
+					fmt.Printf("Start id must be a number\n")
+				} else {
+
+					for i := 2; i < len(args); i++ {
+
+						subToTopic, topicExists := client.availableTopics[args[i]]
+
+						if !topicExists {
+
+							fmt.Printf("Topic doesnt exist %s\n", args[i])
+							continue
+						}
+
+						client.subTopics = append(client.subTopics, subToTopic)
+
+						client.SubscribeTopic(client.subTopics, client.id, int64(fromMsgId), client.subToken)
+					}
+				}
+
+			}
 		case "exit":
 			return nil
 
