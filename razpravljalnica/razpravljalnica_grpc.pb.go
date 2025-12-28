@@ -20,14 +20,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MessageBoard_CreateUser_FullMethodName          = "/razpravljalnica.MessageBoard/CreateUser"
-	MessageBoard_CreateTopic_FullMethodName         = "/razpravljalnica.MessageBoard/CreateTopic"
-	MessageBoard_PostMessage_FullMethodName         = "/razpravljalnica.MessageBoard/PostMessage"
-	MessageBoard_LikeMessage_FullMethodName         = "/razpravljalnica.MessageBoard/LikeMessage"
-	MessageBoard_GetSubscriptionNode_FullMethodName = "/razpravljalnica.MessageBoard/GetSubscriptionNode"
-	MessageBoard_ListTopics_FullMethodName          = "/razpravljalnica.MessageBoard/ListTopics"
-	MessageBoard_GetMessages_FullMethodName         = "/razpravljalnica.MessageBoard/GetMessages"
-	MessageBoard_SubscribeTopic_FullMethodName      = "/razpravljalnica.MessageBoard/SubscribeTopic"
+	MessageBoard_CreateUser_FullMethodName          = "/proto.MessageBoard/CreateUser"
+	MessageBoard_CreateTopic_FullMethodName         = "/proto.MessageBoard/CreateTopic"
+	MessageBoard_PostMessage_FullMethodName         = "/proto.MessageBoard/PostMessage"
+	MessageBoard_LikeMessage_FullMethodName         = "/proto.MessageBoard/LikeMessage"
+	MessageBoard_GetSubscriptionNode_FullMethodName = "/proto.MessageBoard/GetSubscriptionNode"
+	MessageBoard_GetUsers_FullMethodName            = "/proto.MessageBoard/GetUsers"
+	MessageBoard_ListTopics_FullMethodName          = "/proto.MessageBoard/ListTopics"
+	MessageBoard_GetMessages_FullMethodName         = "/proto.MessageBoard/GetMessages"
+	MessageBoard_SubscribeTopic_FullMethodName      = "/proto.MessageBoard/SubscribeTopic"
 )
 
 // MessageBoardClient is the client API for MessageBoard service.
@@ -44,6 +45,7 @@ type MessageBoardClient interface {
 	LikeMessage(ctx context.Context, in *LikeMessageRequest, opts ...grpc.CallOption) (*Message, error)
 	// Request a node to which a subscription can be opened.
 	GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error)
+	GetUsers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*UserResponse, error)
 	// Returns all the topics
 	ListTopics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListTopicsResponse, error)
 	// Returns messages in a topic
@@ -110,6 +112,16 @@ func (c *messageBoardClient) GetSubscriptionNode(ctx context.Context, in *Subscr
 	return out, nil
 }
 
+func (c *messageBoardClient) GetUsers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*UserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserResponse)
+	err := c.cc.Invoke(ctx, MessageBoard_GetUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *messageBoardClient) ListTopics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListTopicsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListTopicsResponse)
@@ -163,6 +175,7 @@ type MessageBoardServer interface {
 	LikeMessage(context.Context, *LikeMessageRequest) (*Message, error)
 	// Request a node to which a subscription can be opened.
 	GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error)
+	GetUsers(context.Context, *emptypb.Empty) (*UserResponse, error)
 	// Returns all the topics
 	ListTopics(context.Context, *emptypb.Empty) (*ListTopicsResponse, error)
 	// Returns messages in a topic
@@ -193,6 +206,9 @@ func (UnimplementedMessageBoardServer) LikeMessage(context.Context, *LikeMessage
 }
 func (UnimplementedMessageBoardServer) GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSubscriptionNode not implemented")
+}
+func (UnimplementedMessageBoardServer) GetUsers(context.Context, *emptypb.Empty) (*UserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUsers not implemented")
 }
 func (UnimplementedMessageBoardServer) ListTopics(context.Context, *emptypb.Empty) (*ListTopicsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTopics not implemented")
@@ -314,6 +330,24 @@ func _MessageBoard_GetSubscriptionNode_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MessageBoard_GetUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageBoardServer).GetUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MessageBoard_GetUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageBoardServer).GetUsers(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MessageBoard_ListTopics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -365,7 +399,7 @@ type MessageBoard_SubscribeTopicServer = grpc.ServerStreamingServer[MessageEvent
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var MessageBoard_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "razpravljalnica.MessageBoard",
+	ServiceName: "proto.MessageBoard",
 	HandlerType: (*MessageBoardServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -389,6 +423,10 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MessageBoard_GetSubscriptionNode_Handler,
 		},
 		{
+			MethodName: "GetUsers",
+			Handler:    _MessageBoard_GetUsers_Handler,
+		},
+		{
 			MethodName: "ListTopics",
 			Handler:    _MessageBoard_ListTopics_Handler,
 		},
@@ -408,7 +446,7 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ControlPlane_GetClusterState_FullMethodName = "/razpravljalnica.ControlPlane/GetClusterState"
+	ControlPlane_GetClusterState_FullMethodName = "/proto.ControlPlane/GetClusterState"
 )
 
 // ControlPlaneClient is the client API for ControlPlane service.
@@ -501,7 +539,7 @@ func _ControlPlane_GetClusterState_Handler(srv interface{}, ctx context.Context,
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ControlPlane_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "razpravljalnica.ControlPlane",
+	ServiceName: "proto.ControlPlane",
 	HandlerType: (*ControlPlaneServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

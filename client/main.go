@@ -28,11 +28,13 @@ func checkError(err error) bool {
 }
 
 type Client struct {
-	conn           *grpc.ClientConn
-	msgBoardClient db.MessageBoardClient
-	controlClient  db.ControlPlaneClient
-	name           string
-	id             int64
+	conn            *grpc.ClientConn
+	msgBoardClient  db.MessageBoardClient
+	controlClient   db.ControlPlaneClient
+	name            string
+	id              int64
+	otherUsers      map[int64]string
+	availableTopics map[string]int64
 }
 
 func (client *Client) CreateUser(name string) (*db.User, error) {
@@ -109,6 +111,7 @@ func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
 
 		for i := 0; i < len(listTopicsRes.Topics); i++ {
 			fmt.Printf("Topic %s id: %d\n", listTopicsRes.Topics[i].Name, listTopicsRes.Topics[i].Id)
+			client.availableTopics[listTopicsRes.Topics[i].Name] = listTopicsRes.Topics[i].Id
 		}
 
 	}
@@ -128,7 +131,17 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 
 			if msg.Text != "" {
 
-				fmt.Printf("Post id: %d, likes: %d, msg: %s\n", msg.Id, msg.Likes, msg.Text)
+				username, userExists := client.otherUsers[msg.UserId]
+
+				if userExists {
+
+					fmt.Printf("Id: %d Posted by: %s, likes: %d, msg: %s\n", msg.Id, username, msg.Likes, msg.Text)
+				} else {
+
+					fmt.Printf("Id: %d Posted by: %d, likes: %d, msg: %s\n", msg.Id, msg.UserId, msg.Likes, msg.Text)
+					fmt.Printf("Refresh userbase with getUsers command\n")
+				}
+
 			}
 
 		}
@@ -178,6 +191,23 @@ func (client *Client) GetClusterState() (*db.GetClusterStateResponse, error) {
 	return clusterStateRes, nil
 }
 
+func (client *Client) GetUsers() (*db.UserResponse, error) {
+
+	getUsersReq := &emptypb.Empty{}
+
+	getUsersRes, err := client.msgBoardClient.GetUsers(context.Background(), getUsersReq)
+
+	if !checkError(err) {
+
+		for _, user := range getUsersRes.User {
+
+			client.otherUsers[user.Id] = user.Name
+		}
+	}
+
+	return getUsersRes, nil
+}
+
 func startClient(url string, name string) error {
 
 	client := Client{}
@@ -189,9 +219,16 @@ func startClient(url string, name string) error {
 	client.conn = conn
 	client.msgBoardClient = db.NewMessageBoardClient(conn)
 	client.name = name
+	client.otherUsers = make(map[int64]string)
+	client.availableTopics = make(map[string]int64)
 	client.CreateUser(name)
+	client.GetUsers()
 
 	fmt.Printf("Welcome to razpravljalnica\n")
+
+	fmt.Printf("\n")
+
+	client.ListTopics()
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -204,34 +241,31 @@ func startClient(url string, name string) error {
 
 		switch args[0] {
 		case "newTopic":
+
 			if len(args) != 2 {
 
 				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
 			} else {
 
-				client.CreateTopic(args[1])
+				topicName := args[1]
+				client.CreateTopic(topicName)
 			}
 		case "post":
+
 			if len(args) < 3 {
 
 				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
 			} else {
 
-				val, err := strconv.Atoi(args[1])
-				if err != nil {
+				topic := args[1]
 
-					fmt.Printf("Invalid id for topic\n")
-				} else {
-
-					postText := ""
-					for i := 2; i < len(args); i++ {
-						postText += " "
-						postText += args[i]
-					}
-
-					client.PostMessage(int64(val), client.id, postText)
-
+				postText := ""
+				for i := 2; i < len(args); i++ {
+					postText += " "
+					postText += args[i]
 				}
+
+				client.PostMessage(client.availableTopics[topic], client.id, postText)
 
 			}
 
@@ -245,15 +279,15 @@ func startClient(url string, name string) error {
 				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
 			} else {
 
-				topicId, err1 := strconv.Atoi(args[1])
-				msgId, err2 := strconv.Atoi(args[2])
+				topic := args[1]
+				msgId, err := strconv.Atoi(args[2])
 
-				if err1 != nil || err2 != nil {
+				if err != nil {
 
 					fmt.Printf("Invalid id for topic or message\n")
 				} else {
 
-					client.LikeMessage(int64(topicId), int64(msgId), client.id)
+					client.LikeMessage(client.availableTopics[topic], int64(msgId), client.id)
 				}
 			}
 		case "listPosts":
@@ -263,29 +297,34 @@ func startClient(url string, name string) error {
 				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
 			} else {
 
-				topicId, err1 := strconv.Atoi(args[1])
-				startingId, err2 := strconv.Atoi(args[2])
-				numOfMsgs, err3 := strconv.Atoi(args[3])
+				topic := args[1]
+				startingId, err1 := strconv.Atoi(args[2])
+				numOfMsgs, err2 := strconv.Atoi(args[3])
 
-				if err1 != nil || err2 != nil || err3 != nil {
+				if err1 != nil || err2 != nil {
 
-					fmt.Printf("Invalid starting id or topic id or wrong number of msgs\n")
+					fmt.Printf("Invalid starting id or number of msgs\n")
 				} else {
 
-					client.GetMessages(int64(topicId), int64(startingId), int32(numOfMsgs))
+					client.GetMessages(client.availableTopics[topic], int64(startingId), int32(numOfMsgs))
 				}
 			}
+		case "getUsers":
+			client.GetUsers()
+
 		case "exit":
 			return nil
+
 		default:
 			fmt.Printf("Help:\n")
-			fmt.Printf("	help                                               - displays all the commands\n")
-			fmt.Printf("	exit                                               - stops the program\n")
-			fmt.Printf("	newTopic <name>                                    - creates a new topic with the name <name>\n")
-			fmt.Printf("	listTopics                                         - displays a list of all available topics and their Ids\n")
-			fmt.Printf("	post <topicId> <msg>                               - creates a new post on the topic <topicId> with the text <msg> if the topic exists\n")
-			fmt.Printf("	like <topicId> <msgId>                             - likes an existing post <msgId> within a topic <topicId> \n")
-			fmt.Printf("	listPosts <topicId> <startingMsgId> <numberOfMsgs> - lists all posts from a topic <topicId> starting with a msgId <startingMsgId> up to the number of wanted posts <numberOfMsgs>\n")
+			fmt.Printf("	help                                                 - displays all the commands\n")
+			fmt.Printf("	exit                                                 - stops the program\n")
+			fmt.Printf("	newTopic <name>                                      - creates a new topic with the name <name>\n")
+			fmt.Printf("	listTopics                                           - displays and updates a list of all available topics and their Ids\n")
+			fmt.Printf("	post <topicName> <msg>                               - creates a new post on the topic <topicName> with the text <msg> if the topic exists\n")
+			fmt.Printf("	like <topicName> <msgId>                             - likes an existing post <msgId> within a topic <topicName> \n")
+			fmt.Printf("	listPosts <topicName> <startingMsgId> <numberOfMsgs> - lists all posts from a topic <topicName> starting with a msgId <startingMsgId> up to the number of wanted posts <numberOfMsgs>\n")
+			fmt.Printf("	getUsers                                             - refreshes the usernames of other users\n")
 
 		}
 	}

@@ -217,6 +217,18 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 	return status.Error(codes.Unimplemented, "method SubscribeTopic not implemented")
 }
 
+func (server *Server) GetUsers(ctx context.Context, req *emptypb.Empty) (*db.UserResponse, error) {
+
+	users := db.UserResponse{User: make([]*db.User, 10)}
+
+	for username, userId := range server.CRUDServer.users {
+
+		users.User = append(users.User, &db.User{Name: username, Id: userId})
+	}
+
+	return &users, nil
+}
+
 func checkError(err error) {
 
 	if err != nil {
