@@ -8,14 +8,23 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"sort"
 	"sync"
+	"time"
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type SubscriptionData struct {
+	topic        int64
+	fromMsgIndex int64
+	lastMsgIndex int64
+}
 
 type Server struct {
 	db.UnimplementedMessageBoardServer
@@ -41,7 +50,7 @@ type ServerDataBase struct {
 	userLikes map[int64][]int64 //map[userId]array[messegeIds]
 	likesLock sync.Mutex
 
-	userSubscription     map[string][]int64
+	userSubscription     map[string][]*SubscriptionData
 	userSubscriptionLock sync.Mutex
 }
 
@@ -69,7 +78,7 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 		currUser.Id = server.CRUDServer.userIndex
 		server.CRUDServer.userIndex++
 
-		server.CRUDServer.userLikes[currUser.Id] = make([]int64, 10)
+		server.CRUDServer.userLikes[currUser.Id] = []int64{}
 
 		server.CRUDServer.userLock.Unlock()
 
@@ -99,7 +108,7 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 
 		server.CRUDServer.topics[req.Name] = server.CRUDServer.topicIndex
 		server.CRUDServer.topicsPosts[server.CRUDServer.topicIndex] = make(map[int64]*db.Message)
-		server.CRUDServer.topicsPostsList[server.CRUDServer.topicIndex] = make([]*db.Message, 10)
+		server.CRUDServer.topicsPostsList[server.CRUDServer.topicIndex] = []*db.Message{}
 		newTopic.Id = server.CRUDServer.topicIndex
 		server.CRUDServer.topicIndex++
 
@@ -177,6 +186,8 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
 
+	fmt.Printf("[INFO]: recieved getSubscription request\n")
+
 	subNode := &db.NodeInfo{}
 	subNode.NodeId = server.nodeId
 	subNode.Address = server.url
@@ -198,7 +209,18 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 
 	subToken := hex.EncodeToString(userToken[:])
 
-	server.CRUDServer.userSubscription[subToken] = req.TopicId
+	_, userTokenExists := server.CRUDServer.userSubscription[subToken]
+
+	if !userTokenExists {
+
+		server.CRUDServer.userSubscriptionLock.Lock()
+
+		server.CRUDServer.userSubscription[subToken] = []*SubscriptionData{}
+
+		server.CRUDServer.userSubscriptionLock.Unlock()
+
+		fmt.Printf("[INFO]: generated userToken\n")
+	}
 
 	subResp := &db.SubscriptionNodeResponse{Node: subNode, SubscribeToken: subToken}
 
@@ -210,7 +232,7 @@ func (server *Server) ListTopics(ctx context.Context, req *emptypb.Empty) (*db.L
 	fmt.Printf("[INFO]: Recieved list topics request\n")
 
 	topicList := db.ListTopicsResponse{}
-	topicList.Topics = make([]*db.Topic, 0, len(server.CRUDServer.topics))
+	topicList.Topics = []*db.Topic{}
 
 	for key, val := range server.CRUDServer.topics {
 		topicList.Topics = append(topicList.Topics, &db.Topic{Id: val, Name: key})
@@ -225,7 +247,7 @@ func (server *Server) GetMessages(ctx context.Context, req *db.GetMessagesReques
 
 	topic, topicExists := server.CRUDServer.topicsPostsList[req.TopicId]
 
-	postResponse := make([]*db.Message, 50)
+	postResponse := []*db.Message{}
 
 	if !topicExists {
 
@@ -246,13 +268,147 @@ func (server *Server) GetMessages(ctx context.Context, req *db.GetMessagesReques
 	return &topicPosts, nil
 }
 
+func (server *Server) doTopicsExist(topicIds []int64) int64 {
+
+	for _, topicId := range topicIds {
+
+		foundTopic := false
+
+		for _, availableTopicId := range server.CRUDServer.topics {
+
+			if availableTopicId == topicId {
+				foundTopic = true
+				break
+			}
+		}
+
+		if !foundTopic {
+
+			return topicId
+		}
+	}
+
+	return 0
+}
+
 func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.MessageBoard_SubscribeTopicServer) error {
-	return status.Error(codes.Unimplemented, "method SubscribeTopic not implemented")
+
+	fmt.Printf("[INFO]: recieved subscription request\n")
+
+	_, userPermited := server.CRUDServer.userSubscription[req.SubscribeToken]
+
+	if !userPermited {
+
+		return status.Error(codes.PermissionDenied, "This user hasnt been authorized to subscribe to this topic")
+	}
+
+	if req.FromMessageId < 1 {
+
+		return status.Error(codes.InvalidArgument, "Starting message id has to be a value above 0")
+	}
+
+	err := server.doTopicsExist(req.TopicId)
+
+	if err != 0 {
+
+		return status.Error(codes.NotFound, "Requested topic doesnt exist")
+	}
+
+	sendNewSubscriptions := []SubscriptionData{}
+
+	server.CRUDServer.userSubscriptionLock.Lock()
+
+	for _, newTopic := range req.TopicId {
+
+		alreadySubed := false
+
+		for _, subedTopics := range server.CRUDServer.userSubscription[req.SubscribeToken] {
+
+			if subedTopics == nil {
+
+				continue
+			}
+
+			if subedTopics.topic == newTopic {
+
+				alreadySubed = true
+				break
+			}
+		}
+
+		if !alreadySubed && newTopic > 0 {
+
+			fmt.Printf("[INFO]: generated new subscription\n")
+
+			newSubscription := &SubscriptionData{topic: newTopic, fromMsgIndex: req.FromMessageId}
+			server.CRUDServer.userSubscription[req.SubscribeToken] = append(server.CRUDServer.userSubscription[req.SubscribeToken], newSubscription)
+			sendNewSubscriptions = append(sendNewSubscriptions, *newSubscription)
+		}
+
+	}
+
+	server.CRUDServer.userSubscriptionLock.Unlock()
+
+	for _, newSub := range sendNewSubscriptions {
+
+		topicList := server.CRUDServer.topicsPostsList[newSub.topic]
+
+		startMsgIndex := sort.Search(len(topicList), func(i int) bool {
+
+			return topicList[i].Id >= newSub.fromMsgIndex
+		})
+
+		if startMsgIndex >= len(topicList) {
+
+			startMsgIndex = len(topicList) - 1
+		}
+
+		if len(topicList) == 0 {
+
+			startMsgIndex = 0
+		}
+
+		newSub.fromMsgIndex = int64(startMsgIndex)
+		newSub.lastMsgIndex = int64(startMsgIndex)
+
+	}
+
+	for {
+
+		for subIndex, subData := range sendNewSubscriptions {
+
+			topic := server.CRUDServer.topicsPostsList[subData.topic]
+
+			if subData.lastMsgIndex != int64(len(topic)-1) {
+
+				for newData := subData.lastMsgIndex + 1; newData < int64(len(topic)); newData++ {
+
+					newEvent := db.MessageEvent{SequenceNumber: newData, Message: topic[newData], EventAt: timestamppb.Now()}
+
+					fmt.Printf("[INFO]: sending new post %s\n", newEvent.Message.Text)
+
+					err := stream.Send(&newEvent)
+
+					if err != nil {
+
+						return err
+					}
+
+					sendNewSubscriptions[subIndex].lastMsgIndex = newData
+
+				}
+
+			}
+		}
+
+		time.Sleep(time.Second)
+	}
+
 }
 
 func (server *Server) GetUsers(ctx context.Context, req *emptypb.Empty) (*db.UserResponse, error) {
 
-	users := db.UserResponse{User: make([]*db.User, 10)}
+	users := db.UserResponse{User: []*db.User{}}
 
 	for username, userId := range server.CRUDServer.users {
 
@@ -285,7 +441,7 @@ func startServer(url string, nodeId string) {
 
 	CRUD.userLikes = make(map[int64][]int64)
 
-	CRUD.userSubscription = make(map[string][]int64)
+	CRUD.userSubscription = make(map[string][]*SubscriptionData)
 
 	fmt.Printf("Server starting: %s\n", url)
 	grpcServer := grpc.NewServer()

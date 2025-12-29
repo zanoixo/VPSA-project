@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -38,7 +37,6 @@ type Client struct {
 	availableTopics map[string]int64
 	subToken        string
 	subNode         *db.NodeInfo
-	subTopics       []int64
 }
 
 func (client *Client) CreateUser(name string) (*db.User, error) {
@@ -64,6 +62,8 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 	if !checkError(err) {
 		fmt.Printf("Topic: %s created\n", createTopicResp.Name)
 	}
+
+	client.availableTopics[name] = createTopicResp.Id
 
 	return createTopicResp, nil
 }
@@ -110,7 +110,7 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 	return SubNodeResp, nil
 }
 
-func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
+func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 	listTopicsReq := &emptypb.Empty{}
 
@@ -118,14 +118,28 @@ func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
 
 	if !checkError(err) {
 
-		for i := 0; i < len(listTopicsRes.Topics); i++ {
-			fmt.Printf("Topic %s id: %d\n", listTopicsRes.Topics[i].Name, listTopicsRes.Topics[i].Id)
-			client.availableTopics[listTopicsRes.Topics[i].Name] = listTopicsRes.Topics[i].Id
+		for _, topic := range listTopicsRes.Topics {
+
+			client.availableTopics[topic.Name] = topic.Id
 		}
 
 	}
 
 	return listTopicsRes, nil
+}
+
+func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
+
+	listTopicsRes, err := client.updateTopicList()
+
+	fmt.Printf("Available topics:\n")
+
+	for _, topic := range listTopicsRes.Topics {
+
+		fmt.Printf("Topic %s\n", topic.Name)
+	}
+
+	return listTopicsRes, err
 }
 
 func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int32) (*db.GetMessagesResponse, error) {
@@ -142,14 +156,12 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 
 				username, userExists := client.otherUsers[msg.UserId]
 
-				if userExists {
+				if !userExists {
 
-					fmt.Printf("Id: %d Posted by: %s, likes: %d, msg: %s\n", msg.Id, username, msg.Likes, msg.Text)
-				} else {
-
-					fmt.Printf("Id: %d Posted by: %d, likes: %d, msg: %s\n", msg.Id, msg.UserId, msg.Likes, msg.Text)
-					fmt.Printf("Refresh userbase with getUsers command\n")
+					client.GetUsers()
 				}
+
+				fmt.Printf("Id: %d Posted by: %s, likes: %d, msg: %s\n", msg.Id, username, msg.Likes, msg.Text)
 
 			}
 
@@ -160,43 +172,64 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 }
 
 func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.SubscribeTopicRequest) error {
+
 	defer close(msgEvents)
 
 	msgStream, err := client.msgBoardClient.SubscribeTopic(context.Background(), req)
-	checkError(err)
+
+	if checkError(err) {
+
+		return err
+	}
 
 	for {
 
 		newMsg, err := msgStream.Recv()
 
+		checkError(err)
+
 		if err == io.EOF {
 			return nil
 		}
+
 		checkError(err)
 
 		msgEvents <- newMsg
+
 	}
 
 }
 
-func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int64, token string) (<-chan *db.MessageEvent, error) {
+func (client *Client) displayNewEvents(msgEvents chan *db.MessageEvent) {
 
-	for _, topic := range topicIDs {
+	for newEvent := range msgEvents {
 
-		if !slices.Contains(client.subTopics, topic) {
+		fmt.Print("\r")
+		fmt.Print("\033[K")
 
-			client.subTopics = append(client.subTopics, topic)
+		_, exists := client.otherUsers[newEvent.Message.UserId]
+
+		if !exists {
+
+			client.GetUsers()
 		}
 
+		fmt.Printf("New post by %s, text: %s\n", client.otherUsers[newEvent.Message.UserId], newEvent.Message.Text)
+		fmt.Printf("$razpravljalnica@%s: ", client.name)
 	}
+}
 
-	client.GetSubscriptionNode(client.id, client.subTopics)
+func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int64, token string) (<-chan *db.MessageEvent, error) {
+
+	client.GetSubscriptionNode(client.id, topicIDs)
 
 	msgEvents := make(chan *db.MessageEvent)
 
-	subTopicReq := &db.SubscribeTopicRequest{TopicId: topicIDs, UserId: userID, FromMessageId: fromMessageID, SubscribeToken: token}
+	subTopicReq := &db.SubscribeTopicRequest{TopicId: topicIDs, UserId: userID, FromMessageId: fromMessageID, SubscribeToken: client.subToken}
 
 	go client.recvTopicEvents(msgEvents, subTopicReq)
+
+	go client.displayNewEvents(msgEvents)
 
 	return msgEvents, nil
 }
@@ -241,7 +274,6 @@ func startClient(url string, name string) error {
 	client.name = name
 	client.otherUsers = make(map[int64]string)
 	client.availableTopics = make(map[string]int64)
-	client.subTopics = make([]int64, 10)
 	client.CreateUser(name)
 	client.GetUsers()
 
@@ -335,7 +367,9 @@ func startClient(url string, name string) error {
 
 		case "sub":
 
-			if len(args) != 3 {
+			client.updateTopicList()
+
+			if len(args) < 3 {
 
 				fmt.Printf("Wrong number of arguments use help to see the list of commands\n")
 			} else {
@@ -347,6 +381,8 @@ func startClient(url string, name string) error {
 					fmt.Printf("Start id must be a number\n")
 				} else {
 
+					newSubs := make([]int64, 1)
+
 					for i := 2; i < len(args); i++ {
 
 						subToTopic, topicExists := client.availableTopics[args[i]]
@@ -357,10 +393,10 @@ func startClient(url string, name string) error {
 							continue
 						}
 
-						client.subTopics = append(client.subTopics, subToTopic)
+						newSubs = append(newSubs, subToTopic)
 
-						client.SubscribeTopic(client.subTopics, client.id, int64(fromMsgId), client.subToken)
 					}
+					client.SubscribeTopic(newSubs, client.id, int64(fromMsgId), client.subToken)
 				}
 
 			}
