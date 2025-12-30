@@ -149,6 +149,22 @@ func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageReques
 	return newPost, nil
 }
 
+func (server *Server) userExists(userId int64) string {
+
+	user := ""
+
+	for username, id := range server.CRUDServer.users {
+
+		if id == userId {
+
+			return username
+		}
+	}
+
+	return user
+
+}
+
 func (server *Server) alreadyLiked(userId int64, messageId int64) bool {
 
 	return slices.Contains(server.CRUDServer.userLikes[userId], messageId)
@@ -164,6 +180,12 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 		fmt.Printf("[INFO]: Post doesnt exist\n")
 		return nil, status.Error(codes.NotFound, "Post doesnt exist")
+	}
+
+	if server.userExists(req.UserId) == "" {
+
+		fmt.Printf("[INFO]: User doesnt exist\n")
+		return nil, status.Error(codes.NotFound, "User doesnt exist")
 	}
 
 	if server.alreadyLiked(req.UserId, req.MessageId) {
@@ -192,16 +214,11 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 	subNode.NodeId = server.nodeId
 	subNode.Address = server.url
 
-	user := ""
-
-	for username, id := range server.CRUDServer.users {
-
-		if id == req.UserId {
-			user = username
-		}
-	}
+	user := server.userExists(req.UserId)
 
 	if user == "" {
+
+		fmt.Printf("[INFO]: User doesnt exist\n")
 		return nil, status.Error(codes.NotFound, "User doesnt exist")
 	}
 
@@ -296,6 +313,12 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 	fmt.Printf("[INFO]: recieved subscription request\n")
 
 	_, userPermited := server.CRUDServer.userSubscription[req.SubscribeToken]
+
+	if server.userExists(req.UserId) == "" {
+
+		fmt.Printf("[INFO]: User doesnt exist\n")
+		return status.Error(codes.NotFound, "User doesnt exist")
+	}
 
 	if !userPermited {
 

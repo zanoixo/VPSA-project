@@ -35,6 +35,7 @@ type Client struct {
 	id              int64
 	otherUsers      map[int64]string
 	availableTopics map[string]int64
+	idToTopic       map[int64]string
 	subToken        string
 	subNode         *db.NodeInfo
 }
@@ -64,6 +65,7 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 	}
 
 	client.availableTopics[name] = createTopicResp.Id
+	client.idToTopic[createTopicResp.Id] = name
 
 	return createTopicResp, nil
 }
@@ -121,6 +123,7 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 		for _, topic := range listTopicsRes.Topics {
 
 			client.availableTopics[topic.Name] = topic.Id
+			client.idToTopic[topic.Id] = topic.Name
 		}
 
 	}
@@ -161,7 +164,7 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 					client.GetUsers()
 				}
 
-				fmt.Printf("Id: %d Posted by: %s, likes: %d, msg: %s\n", msg.Id, username, msg.Likes, msg.Text)
+				fmt.Printf("[%s]@%s: %s - likes: %d\n", client.idToTopic[msg.TopicId], username, msg.Text, msg.Likes)
 
 			}
 
@@ -214,7 +217,7 @@ func (client *Client) displayNewEvents(msgEvents chan *db.MessageEvent) {
 			client.GetUsers()
 		}
 
-		fmt.Printf("New post by %s, text: %s\n", client.otherUsers[newEvent.Message.UserId], newEvent.Message.Text)
+		fmt.Printf("[%s]@%s: %s - likes: %d\n", client.idToTopic[newEvent.Message.TopicId], client.otherUsers[newEvent.Message.UserId], newEvent.Message.Text, newEvent.Message.Likes)
 		fmt.Printf("$razpravljalnica@%s: ", client.name)
 	}
 }
@@ -274,6 +277,7 @@ func startClient(url string, name string) error {
 	client.name = name
 	client.otherUsers = make(map[int64]string)
 	client.availableTopics = make(map[string]int64)
+	client.idToTopic = map[int64]string{}
 	client.CreateUser(name)
 	client.GetUsers()
 
