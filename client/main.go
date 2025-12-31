@@ -217,7 +217,7 @@ func (client *Client) displayNewEvents(msgEvents chan *db.MessageEvent) {
 			client.GetUsers()
 		}
 
-		fmt.Printf("[%s]@%s: %s - likes: %d\n", client.idToTopic[newEvent.Message.TopicId], client.otherUsers[newEvent.Message.UserId], newEvent.Message.Text, newEvent.Message.Likes)
+		fmt.Printf("[%s]@%s: %s - likes: %d post id: %d\n", client.idToTopic[newEvent.Message.TopicId], client.otherUsers[newEvent.Message.UserId], newEvent.Message.Text, newEvent.Message.Likes, newEvent.Message.Id)
 		fmt.Printf("$razpravljalnica@%s: ", client.name)
 	}
 }

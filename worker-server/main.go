@@ -396,35 +396,67 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 
 	}
 
+	ctx := stream.Context()
+
 	for {
 
-		for subIndex, subData := range sendNewSubscriptions {
+		select {
+		case <-ctx.Done():
 
-			topic := server.CRUDServer.topicsPostsList[subData.topic]
+			fmt.Printf("[INFO]: Stopped sending\n")
 
-			if subData.lastMsgIndex != int64(len(topic)-1) {
+			server.CRUDServer.userSubscriptionLock.Lock()
 
-				for newData := subData.lastMsgIndex + 1; newData < int64(len(topic)); newData++ {
+			for _, newSubTopic := range sendNewSubscriptions {
 
-					newEvent := db.MessageEvent{SequenceNumber: newData, Message: topic[newData], EventAt: timestamppb.Now()}
+				for subIndex, subedTopic := range server.CRUDServer.userSubscription[req.SubscribeToken] {
 
-					fmt.Printf("[INFO]: sending new post %s\n", newEvent.Message.Text)
+					if subedTopic == nil {
 
-					err := stream.Send(&newEvent)
-
-					if err != nil {
-
-						return err
+						continue
 					}
 
-					sendNewSubscriptions[subIndex].lastMsgIndex = newData
+					if newSubTopic.topic == subedTopic.topic {
+
+						server.CRUDServer.userSubscription[req.SubscribeToken][subIndex] = nil
+						break
+					}
+				}
+			}
+
+			server.CRUDServer.userSubscriptionLock.Unlock()
+
+			return nil
+
+		default:
+			for subIndex, subData := range sendNewSubscriptions {
+
+				topic := server.CRUDServer.topicsPostsList[subData.topic]
+
+				if subData.lastMsgIndex != int64(len(topic)-1) {
+
+					for newData := subData.lastMsgIndex + 1; newData < int64(len(topic)); newData++ {
+
+						newEvent := db.MessageEvent{SequenceNumber: newData, Message: topic[newData], EventAt: timestamppb.Now()}
+
+						fmt.Printf("[INFO]: sending new post %s\n", newEvent.Message.Text)
+
+						err := stream.Send(&newEvent)
+
+						if err != nil {
+
+							return err
+						}
+
+						sendNewSubscriptions[subIndex].lastMsgIndex = newData
+
+					}
 
 				}
-
 			}
-		}
 
-		time.Sleep(time.Second)
+			time.Sleep(time.Second)
+		}
 	}
 
 }
