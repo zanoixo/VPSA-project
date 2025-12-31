@@ -12,7 +12,9 @@ import (
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -28,23 +30,25 @@ func checkError(err error) bool {
 }
 
 type Client struct {
-	conn            *grpc.ClientConn
-	msgBoardClient  db.MessageBoardClient
-	controlClient   db.ControlPlaneClient
-	name            string
-	id              int64
-	otherUsers      map[int64]string
-	availableTopics map[string]int64
-	idToTopic       map[int64]string
-	subToken        string
-	subNode         *db.NodeInfo
+	headServer         string
+	tailServer         string
+	msgBoardHeadClient db.MessageBoardClient
+	msgBoardSubClient  db.MessageBoardClient
+	msgBoardTailClient db.MessageBoardClient
+	controlClient      db.ControlPlaneClient
+	name               string
+	id                 int64
+	otherUsers         map[int64]string
+	availableTopics    map[string]int64
+	idToTopic          map[int64]string
+	subToken           string
 }
 
 func (client *Client) CreateUser(name string) (*db.User, error) {
 
 	createUsrReq := &db.CreateUserRequest{Name: name}
 
-	createUsrResp, err := client.msgBoardClient.CreateUser(context.Background(), createUsrReq)
+	createUsrResp, err := client.msgBoardHeadClient.CreateUser(context.Background(), createUsrReq)
 
 	if !checkError(err) {
 		client.id = createUsrResp.Id
@@ -58,7 +62,7 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 
 	newTopicReq := &db.CreateTopicRequest{Name: name}
 
-	createTopicResp, err := client.msgBoardClient.CreateTopic(context.Background(), newTopicReq)
+	createTopicResp, err := client.msgBoardHeadClient.CreateTopic(context.Background(), newTopicReq)
 
 	if !checkError(err) {
 		fmt.Printf("Topic: %s created\n", createTopicResp.Name)
@@ -74,7 +78,7 @@ func (client *Client) PostMessage(topicID, userID int64, text string) (*db.Messa
 
 	newPostReq := &db.PostMessageRequest{TopicId: topicID, UserId: userID, Text: text}
 
-	PostResp, err := client.msgBoardClient.PostMessage(context.Background(), newPostReq)
+	PostResp, err := client.msgBoardHeadClient.PostMessage(context.Background(), newPostReq)
 
 	if !checkError(err) {
 		fmt.Printf("Post created: %s\n", PostResp.Text)
@@ -87,7 +91,7 @@ func (client *Client) LikeMessage(topicID, messageID, userID int64) (*db.Message
 
 	newLikeReq := &db.LikeMessageRequest{TopicId: topicID, MessageId: messageID, UserId: userID}
 
-	LikeResp, err := client.msgBoardClient.LikeMessage(context.Background(), newLikeReq)
+	LikeResp, err := client.msgBoardHeadClient.LikeMessage(context.Background(), newLikeReq)
 
 	if !checkError(err) {
 
@@ -101,12 +105,11 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 
 	subNodeReq := &db.SubscriptionNodeRequest{UserId: userID, TopicId: topicIDs}
 
-	SubNodeResp, err := client.msgBoardClient.GetSubscriptionNode(context.Background(), subNodeReq)
+	SubNodeResp, err := client.msgBoardHeadClient.GetSubscriptionNode(context.Background(), subNodeReq)
 
 	if !checkError(err) {
 
 		client.subToken = SubNodeResp.SubscribeToken
-		client.subNode = SubNodeResp.Node
 	}
 
 	return SubNodeResp, nil
@@ -116,7 +119,7 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 	listTopicsReq := &emptypb.Empty{}
 
-	listTopicsRes, err := client.msgBoardClient.ListTopics(context.Background(), listTopicsReq)
+	listTopicsRes, err := client.msgBoardTailClient.ListTopics(context.Background(), listTopicsReq)
 
 	if !checkError(err) {
 
@@ -149,7 +152,7 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 
 	getMsgReq := &db.GetMessagesRequest{TopicId: topicID, FromMessageId: fromMessageID, Limit: limit}
 
-	msgResp, err := client.msgBoardClient.GetMessages(context.Background(), getMsgReq)
+	msgResp, err := client.msgBoardTailClient.GetMessages(context.Background(), getMsgReq)
 
 	if !checkError(err) {
 
@@ -178,7 +181,7 @@ func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.S
 
 	defer close(msgEvents)
 
-	msgStream, err := client.msgBoardClient.SubscribeTopic(context.Background(), req)
+	msgStream, err := client.msgBoardSubClient.SubscribeTopic(context.Background(), req)
 
 	if checkError(err) {
 
@@ -224,7 +227,17 @@ func (client *Client) displayNewEvents(msgEvents chan *db.MessageEvent) {
 
 func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int64, token string) (<-chan *db.MessageEvent, error) {
 
-	client.GetSubscriptionNode(client.id, topicIDs)
+	subNode, _ := client.GetSubscriptionNode(client.id, topicIDs)
+
+	fmt.Printf("Connecting to tail server %s\n", subNode.Node.Address)
+	subConn, err := grpc.NewClient(subNode.Node.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if checkError(err) {
+
+		return nil, status.Error(codes.Unavailable, "Subscription server not available")
+	}
+
+	client.msgBoardSubClient = db.NewMessageBoardClient(subConn)
 
 	msgEvents := make(chan *db.MessageEvent)
 
@@ -251,7 +264,7 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 
 	getUsersReq := &emptypb.Empty{}
 
-	getUsersRes, err := client.msgBoardClient.GetUsers(context.Background(), getUsersReq)
+	getUsersRes, err := client.msgBoardTailClient.GetUsers(context.Background(), getUsersReq)
 
 	if !checkError(err) {
 
@@ -264,16 +277,21 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 	return getUsersRes, nil
 }
 
-func startClient(url string, name string) error {
+func startClient(headUrl string, tailUrl string, name string) error {
 
 	client := Client{}
 
-	fmt.Printf("Connecting to server %s\n", url)
-	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	fmt.Printf("Connecting to head server %s\n", headUrl)
+	headConn, err := grpc.NewClient(headUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	checkError(err)
 
-	client.conn = conn
-	client.msgBoardClient = db.NewMessageBoardClient(conn)
+	fmt.Printf("Connecting to tail server %s\n", tailUrl)
+	tailConn, err := grpc.NewClient(tailUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	checkError(err)
+
+	client.msgBoardHeadClient = db.NewMessageBoardClient(headConn)
+	client.msgBoardTailClient = db.NewMessageBoardClient(tailConn)
+	client.msgBoardSubClient = nil
 	client.name = name
 	client.otherUsers = make(map[int64]string)
 	client.availableTopics = make(map[string]int64)
@@ -417,6 +435,7 @@ func startClient(url string, name string) error {
 			fmt.Printf("	like <topicName> <msgId>                             - likes an existing post <msgId> within a topic <topicName> \n")
 			fmt.Printf("	listPosts <topicName> <startingMsgId> <numberOfMsgs> - lists all posts from a topic <topicName> starting with a msgId <startingMsgId> up to the number of wanted posts <numberOfMsgs>\n")
 			fmt.Printf("	getUsers                                             - refreshes the usernames of other users\n")
+			fmt.Printf("	sub <startingMsgId> <topic names>                    - subscribes user to topics <topic names> and starts displaying all messages from post starting with id <startingMsgId> onward\n")
 
 		}
 	}
@@ -425,12 +444,14 @@ func startClient(url string, name string) error {
 func main() {
 
 	iPtr := flag.String("ip", "localhost", "server IP")
-	pPtr := flag.Int("p", 6000, "server port")
+	hpPtr := flag.Int("hp", 6000, "head server port")
+	tpPtr := flag.Int("tp", 6001, "tail server port")
 	nPtr := flag.String("n", "noName", "name of client")
 	flag.Parse()
 
-	url := fmt.Sprintf("%v:%v", *iPtr, *pPtr)
+	headUrl := fmt.Sprintf("%v:%v", *iPtr, *hpPtr)
+	tailUrl := fmt.Sprintf("%v:%v", *iPtr, *tpPtr)
 
-	startClient(url, *nPtr)
+	startClient(headUrl, tailUrl, *nPtr)
 
 }
