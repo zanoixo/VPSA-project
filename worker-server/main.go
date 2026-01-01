@@ -15,6 +15,7 @@ import (
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,9 +29,22 @@ type SubscriptionData struct {
 
 type Server struct {
 	db.UnimplementedMessageBoardServer
-	CRUDServer *ServerDataBase
-	url        string
-	nodeId     string
+	CRUDServer          *ServerDataBase
+	msgBoardReplication db.MessageBoardClient
+	msgBoardSubGen      db.MessageBoardClient
+
+	url    string
+	nodeId string
+
+	isHead        bool
+	isTail        bool
+	nextServerUrl string
+
+	numOfServer int
+
+	nodes       []*db.NodeInfo
+	nextSub     int
+	subNodeLock sync.Mutex
 }
 
 type ServerDataBase struct {
@@ -54,9 +68,24 @@ type ServerDataBase struct {
 	userSubscriptionLock sync.Mutex
 }
 
+func (server *Server) Ping(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+
+	return &emptypb.Empty{}, nil
+}
+
 func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest) (*db.User, error) {
 
 	fmt.Printf("[INFO]: Recieved create user request from %s\n", req.Name)
+
+	if !server.isTail {
+
+		_, err := server.msgBoardReplication.CreateUser(context.Background(), req)
+
+		if err != nil {
+
+			return nil, err
+		}
+	}
 
 	currUser := db.User{}
 	currUser.Name = req.Name
@@ -91,6 +120,16 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 
 	fmt.Printf("[INFO]: Recieved create topic request: %s\n", req.Name)
 
+	if !server.isTail {
+
+		_, err := server.msgBoardReplication.CreateTopic(context.Background(), req)
+
+		if err != nil {
+
+			return nil, err
+		}
+	}
+
 	newTopic := db.Topic{}
 	newTopic.Name = req.Name
 
@@ -122,6 +161,16 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageRequest) (*db.Message, error) {
 
 	fmt.Printf("[INFO]: Recieved create post request\n")
+
+	if !server.isTail {
+
+		_, err := server.msgBoardReplication.PostMessage(context.Background(), req)
+
+		if err != nil {
+
+			return nil, err
+		}
+	}
 
 	newPost := &db.Message{}
 	newPost.Text = req.Text
@@ -174,6 +223,16 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 	fmt.Printf("[INFO]: Like message request recieved\n")
 
+	if !server.isTail {
+
+		_, err := server.msgBoardReplication.LikeMessage(context.Background(), req)
+
+		if err != nil {
+
+			return nil, err
+		}
+	}
+
 	likedMsg, msgExists := server.CRUDServer.topicsPosts[req.TopicId][req.MessageId]
 
 	if !msgExists {
@@ -206,13 +265,7 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 	return likedMsg, nil
 }
 
-func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
-
-	fmt.Printf("[INFO]: recieved getSubscription request\n")
-
-	subNode := &db.NodeInfo{}
-	subNode.NodeId = server.nodeId
-	subNode.Address = server.url
+func (server *Server) GenerateSubscription(ctx context.Context, req *db.SubscriptionNodeRequest) (*emptypb.Empty, error) {
 
 	user := server.userExists(req.UserId)
 
@@ -239,6 +292,61 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 		fmt.Printf("[INFO]: generated userToken\n")
 	}
 
+	return nil, nil
+}
+
+func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
+
+	fmt.Printf("[INFO]: recieved getSubscription request\n")
+
+	if !server.isHead {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request a node from a server that isnt the head server")
+	}
+
+	user := server.userExists(req.UserId)
+
+	if user == "" {
+
+		fmt.Printf("[INFO]: User doesnt exist\n")
+		return nil, status.Error(codes.NotFound, "User doesnt exist")
+	}
+
+	server.subNodeLock.Lock()
+
+	subNode := &db.NodeInfo{}
+
+	for {
+
+		subNode = server.nodes[server.nextSub]
+		server.nextSub = (server.nextSub + 1) % server.numOfServer
+
+		nextSubConn, _ := grpc.NewClient(subNode.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		server.msgBoardSubGen = db.NewMessageBoardClient(nextSubConn)
+
+		_, err := server.msgBoardSubGen.Ping(context.Background(), &emptypb.Empty{})
+
+		if err == nil {
+
+			break
+		}
+
+		fmt.Printf("[INFO] can't connect to %s\n", subNode.Address)
+	}
+
+	server.subNodeLock.Unlock()
+
+	userToken := sha256.Sum256([]byte(user))
+
+	subToken := hex.EncodeToString(userToken[:])
+
+	_, err := server.msgBoardSubGen.GenerateSubscription(context.Background(), req)
+
+	if err != nil {
+
+		return nil, err
+	}
+
 	subResp := &db.SubscriptionNodeResponse{Node: subNode, SubscribeToken: subToken}
 
 	return subResp, nil
@@ -247,6 +355,11 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 func (server *Server) ListTopics(ctx context.Context, req *emptypb.Empty) (*db.ListTopicsResponse, error) {
 
 	fmt.Printf("[INFO]: Recieved list topics request\n")
+
+	if !server.isTail {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to list topics on a server that isn't the tail server")
+	}
 
 	topicList := db.ListTopicsResponse{}
 	topicList.Topics = []*db.Topic{}
@@ -259,6 +372,13 @@ func (server *Server) ListTopics(ctx context.Context, req *emptypb.Empty) (*db.L
 }
 
 func (server *Server) GetMessages(ctx context.Context, req *db.GetMessagesRequest) (*db.GetMessagesResponse, error) {
+
+	fmt.Printf("[INFO]: Recieved get messages request\n")
+
+	if !server.isTail {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to get messages on a server that isn't the tail server")
+	}
 
 	topicPosts := db.GetMessagesResponse{}
 
@@ -463,6 +583,13 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 
 func (server *Server) GetUsers(ctx context.Context, req *emptypb.Empty) (*db.UserResponse, error) {
 
+	fmt.Printf("[INFO]: Recieved get users request\n")
+
+	if !server.isTail {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to list users on a server that isn't the tail server")
+	}
+
 	users := db.UserResponse{User: []*db.User{}}
 
 	for username, userId := range server.CRUDServer.users {
@@ -473,6 +600,16 @@ func (server *Server) GetUsers(ctx context.Context, req *emptypb.Empty) (*db.Use
 	return &users, nil
 }
 
+func (server *Server) GenerateSubscriptionNodes(ip string, port int) {
+
+	server.nodes = make([]*db.NodeInfo, server.numOfServer)
+
+	for nodeId := 0; nodeId < server.numOfServer; nodeId++ {
+
+		server.nodes[nodeId] = &db.NodeInfo{NodeId: fmt.Sprintf("%d", nodeId), Address: fmt.Sprintf("%v:%v", ip, port+nodeId)}
+	}
+}
+
 func checkError(err error) {
 
 	if err != nil {
@@ -481,7 +618,9 @@ func checkError(err error) {
 
 }
 
-func startServer(url string, nodeId string) {
+func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, numOfServers int) {
+
+	currUrl := fmt.Sprintf("%v:%v", ip, port)
 
 	CRUD := ServerDataBase{}
 	CRUD.users = make(map[string]int64)
@@ -498,17 +637,57 @@ func startServer(url string, nodeId string) {
 
 	CRUD.userSubscription = make(map[string][]*SubscriptionData)
 
-	fmt.Printf("Server starting: %s\n", url)
+	fmt.Printf("Server starting: %s\n", currUrl)
 	grpcServer := grpc.NewServer()
 
 	server := Server{}
 	server.CRUDServer = &CRUD
-	server.url = url
+	server.url = currUrl
 	server.nodeId = nodeId
+	server.isHead = isHead
+	server.isTail = isTail
+	server.numOfServer = numOfServers
+	server.nextSub = 0
+
+	if !isTail {
+
+		server.nextServerUrl = fmt.Sprintf("%v:%v", ip, port+1)
+
+		go func() {
+			fmt.Printf("[INFO]: Trying to connect to the next server in chain\n")
+
+			for {
+
+				nextConn, _ := grpc.NewClient(server.nextServerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+				server.msgBoardReplication = db.NewMessageBoardClient(nextConn)
+
+				_, err := server.msgBoardReplication.Ping(context.Background(), &emptypb.Empty{})
+
+				if err == nil {
+
+					fmt.Printf("[INFO]: Successfully connected to the next server in chain\n")
+
+					break
+				} else {
+
+					fmt.Printf("[INFO]: Failed to connect to the next server in chain retrying\n")
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}()
+	} else {
+
+		server.nextServerUrl = ""
+	}
+
+	if server.isHead {
+
+		server.GenerateSubscriptionNodes(ip, port)
+	}
 
 	db.RegisterMessageBoardServer(grpcServer, &server)
 
-	listener, err := net.Listen("tcp", url)
+	listener, err := net.Listen("tcp", currUrl)
 	checkError(err)
 
 	err = grpcServer.Serve(listener)
@@ -521,9 +700,18 @@ func main() {
 	iPtr := flag.String("ip", "localhost", "server IP")
 	pPtr := flag.Int("p", 6000, "server port")
 	nPtr := flag.String("n", "0", "Node id")
+	hptr := flag.Bool("h", false, "Is the server a head server")
+	tptr := flag.Bool("t", false, "Is the server a tail server")
+	sptr := flag.Int("s", 4, "Number of servers")
+
 	flag.Parse()
 
-	url := fmt.Sprintf("%v:%v", *iPtr, *pPtr)
+	ip := *iPtr
+	port := *pPtr
+	nodeId := *nPtr
+	isHead := *hptr
+	isTail := *tptr
+	numOfServers := *sptr
 
-	startServer(url, *nPtr)
+	startServer(ip, port, nodeId, isHead, isTail, numOfServers)
 }

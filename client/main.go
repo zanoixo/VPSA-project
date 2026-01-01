@@ -129,6 +129,9 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 			client.idToTopic[topic.Id] = topic.Name
 		}
 
+	} else {
+
+		return nil, err
 	}
 
 	return listTopicsRes, nil
@@ -137,6 +140,11 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
 
 	listTopicsRes, err := client.updateTopicList()
+
+	if err != nil {
+
+		return nil, err
+	}
 
 	fmt.Printf("Available topics:\n")
 
@@ -229,7 +237,7 @@ func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int
 
 	subNode, _ := client.GetSubscriptionNode(client.id, topicIDs)
 
-	fmt.Printf("Connecting to tail server %s\n", subNode.Node.Address)
+	fmt.Printf("Connecting to subscription server %s\n", subNode.Node.Address)
 	subConn, err := grpc.NewClient(subNode.Node.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if checkError(err) {
@@ -445,7 +453,7 @@ func main() {
 
 	iPtr := flag.String("ip", "localhost", "server IP")
 	hpPtr := flag.Int("hp", 6000, "head server port")
-	tpPtr := flag.Int("tp", 6001, "tail server port")
+	tpPtr := flag.Int("tp", 6000, "tail server port")
 	nPtr := flag.String("n", "noName", "name of client")
 	flag.Parse()
 

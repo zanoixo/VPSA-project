@@ -20,15 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MessageBoard_CreateUser_FullMethodName          = "/proto.MessageBoard/CreateUser"
-	MessageBoard_CreateTopic_FullMethodName         = "/proto.MessageBoard/CreateTopic"
-	MessageBoard_PostMessage_FullMethodName         = "/proto.MessageBoard/PostMessage"
-	MessageBoard_LikeMessage_FullMethodName         = "/proto.MessageBoard/LikeMessage"
-	MessageBoard_GetSubscriptionNode_FullMethodName = "/proto.MessageBoard/GetSubscriptionNode"
-	MessageBoard_GetUsers_FullMethodName            = "/proto.MessageBoard/GetUsers"
-	MessageBoard_ListTopics_FullMethodName          = "/proto.MessageBoard/ListTopics"
-	MessageBoard_GetMessages_FullMethodName         = "/proto.MessageBoard/GetMessages"
-	MessageBoard_SubscribeTopic_FullMethodName      = "/proto.MessageBoard/SubscribeTopic"
+	MessageBoard_CreateUser_FullMethodName           = "/proto.MessageBoard/CreateUser"
+	MessageBoard_CreateTopic_FullMethodName          = "/proto.MessageBoard/CreateTopic"
+	MessageBoard_PostMessage_FullMethodName          = "/proto.MessageBoard/PostMessage"
+	MessageBoard_LikeMessage_FullMethodName          = "/proto.MessageBoard/LikeMessage"
+	MessageBoard_GetSubscriptionNode_FullMethodName  = "/proto.MessageBoard/GetSubscriptionNode"
+	MessageBoard_GetUsers_FullMethodName             = "/proto.MessageBoard/GetUsers"
+	MessageBoard_ListTopics_FullMethodName           = "/proto.MessageBoard/ListTopics"
+	MessageBoard_GetMessages_FullMethodName          = "/proto.MessageBoard/GetMessages"
+	MessageBoard_SubscribeTopic_FullMethodName       = "/proto.MessageBoard/SubscribeTopic"
+	MessageBoard_Ping_FullMethodName                 = "/proto.MessageBoard/Ping"
+	MessageBoard_GenerateSubscription_FullMethodName = "/proto.MessageBoard/GenerateSubscription"
 )
 
 // MessageBoardClient is the client API for MessageBoard service.
@@ -52,6 +54,8 @@ type MessageBoardClient interface {
 	GetMessages(ctx context.Context, in *GetMessagesRequest, opts ...grpc.CallOption) (*GetMessagesResponse, error)
 	// Subscribe to topics; goes to the node returned by head
 	SubscribeTopic(ctx context.Context, in *SubscribeTopicRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MessageEvent], error)
+	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GenerateSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type messageBoardClient struct {
@@ -161,6 +165,26 @@ func (c *messageBoardClient) SubscribeTopic(ctx context.Context, in *SubscribeTo
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MessageBoard_SubscribeTopicClient = grpc.ServerStreamingClient[MessageEvent]
 
+func (c *messageBoardClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, MessageBoard_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *messageBoardClient) GenerateSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, MessageBoard_GenerateSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MessageBoardServer is the server API for MessageBoard service.
 // All implementations must embed UnimplementedMessageBoardServer
 // for forward compatibility.
@@ -182,6 +206,8 @@ type MessageBoardServer interface {
 	GetMessages(context.Context, *GetMessagesRequest) (*GetMessagesResponse, error)
 	// Subscribe to topics; goes to the node returned by head
 	SubscribeTopic(*SubscribeTopicRequest, grpc.ServerStreamingServer[MessageEvent]) error
+	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	GenerateSubscription(context.Context, *SubscriptionNodeRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMessageBoardServer()
 }
 
@@ -218,6 +244,12 @@ func (UnimplementedMessageBoardServer) GetMessages(context.Context, *GetMessages
 }
 func (UnimplementedMessageBoardServer) SubscribeTopic(*SubscribeTopicRequest, grpc.ServerStreamingServer[MessageEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeTopic not implemented")
+}
+func (UnimplementedMessageBoardServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedMessageBoardServer) GenerateSubscription(context.Context, *SubscriptionNodeRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateSubscription not implemented")
 }
 func (UnimplementedMessageBoardServer) mustEmbedUnimplementedMessageBoardServer() {}
 func (UnimplementedMessageBoardServer) testEmbeddedByValue()                      {}
@@ -395,6 +427,42 @@ func _MessageBoard_SubscribeTopic_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MessageBoard_SubscribeTopicServer = grpc.ServerStreamingServer[MessageEvent]
 
+func _MessageBoard_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageBoardServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MessageBoard_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageBoardServer).Ping(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MessageBoard_GenerateSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubscriptionNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageBoardServer).GenerateSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MessageBoard_GenerateSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageBoardServer).GenerateSubscription(ctx, req.(*SubscriptionNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MessageBoard_ServiceDesc is the grpc.ServiceDesc for MessageBoard service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -433,6 +501,14 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMessages",
 			Handler:    _MessageBoard_GetMessages_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _MessageBoard_Ping_Handler,
+		},
+		{
+			MethodName: "GenerateSubscription",
+			Handler:    _MessageBoard_GenerateSubscription_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

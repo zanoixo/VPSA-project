@@ -80,6 +80,10 @@ service  MessageBoard{
   // Subscribe to topics; goes to the node returned by head
   rpc SubscribeTopic(SubscribeTopicRequest) returns (stream MessageEvent);
 
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  rpc GenerateSubscription(SubscriptionNodeRequest) returns (google.protobuf.Empty);
+
 }
 
 message UserResponse {
