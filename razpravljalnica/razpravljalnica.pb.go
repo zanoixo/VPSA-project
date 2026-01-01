@@ -1061,6 +1061,230 @@ func (x *GetClusterStateResponse) GetTail() *NodeInfo {
 	return nil
 }
 
+type SyncUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncUserRequest) Reset() {
+	*x = SyncUserRequest{}
+	mi := &file_proto_razpravljalnica_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncUserRequest) ProtoMessage() {}
+
+func (x *SyncUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_razpravljalnica_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncUserRequest.ProtoReflect.Descriptor instead.
+func (*SyncUserRequest) Descriptor() ([]byte, []int) {
+	return file_proto_razpravljalnica_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SyncUserRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *SyncUserRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type SyncTopicRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncTopicRequest) Reset() {
+	*x = SyncTopicRequest{}
+	mi := &file_proto_razpravljalnica_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncTopicRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncTopicRequest) ProtoMessage() {}
+
+func (x *SyncTopicRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_razpravljalnica_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncTopicRequest.ProtoReflect.Descriptor instead.
+func (*SyncTopicRequest) Descriptor() ([]byte, []int) {
+	return file_proto_razpravljalnica_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SyncTopicRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *SyncTopicRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type SyncMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TopicId       int64                  `protobuf:"varint,1,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	PostId        int64                  `protobuf:"varint,2,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`
+	Post          *Message               `protobuf:"bytes,3,opt,name=post,proto3" json:"post,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncMessageRequest) Reset() {
+	*x = SyncMessageRequest{}
+	mi := &file_proto_razpravljalnica_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncMessageRequest) ProtoMessage() {}
+
+func (x *SyncMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_razpravljalnica_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncMessageRequest.ProtoReflect.Descriptor instead.
+func (*SyncMessageRequest) Descriptor() ([]byte, []int) {
+	return file_proto_razpravljalnica_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SyncMessageRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
+}
+
+func (x *SyncMessageRequest) GetPostId() int64 {
+	if x != nil {
+		return x.PostId
+	}
+	return 0
+}
+
+func (x *SyncMessageRequest) GetPost() *Message {
+	if x != nil {
+		return x.Post
+	}
+	return nil
+}
+
+type SyncLikeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     int64                  `protobuf:"varint,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	TopicId       int64                  `protobuf:"varint,3,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncLikeRequest) Reset() {
+	*x = SyncLikeRequest{}
+	mi := &file_proto_razpravljalnica_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncLikeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncLikeRequest) ProtoMessage() {}
+
+func (x *SyncLikeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_razpravljalnica_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncLikeRequest.ProtoReflect.Descriptor instead.
+func (*SyncLikeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_razpravljalnica_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SyncLikeRequest) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+func (x *SyncLikeRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *SyncLikeRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
+}
+
 var File_proto_razpravljalnica_proto protoreflect.FileDescriptor
 
 const file_proto_razpravljalnica_proto_rawDesc = "" +
@@ -1129,7 +1353,22 @@ const file_proto_razpravljalnica_proto_rawDesc = "" +
 	"\bevent_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\aeventAt\"c\n" +
 	"\x17GetClusterStateResponse\x12#\n" +
 	"\x04head\x18\x01 \x01(\v2\x0f.proto.NodeInfoR\x04head\x12#\n" +
-	"\x04tail\x18\x02 \x01(\v2\x0f.proto.NodeInfoR\x04tail*\"\n" +
+	"\x04tail\x18\x02 \x01(\v2\x0f.proto.NodeInfoR\x04tail\"5\n" +
+	"\x0fSyncUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"6\n" +
+	"\x10SyncTopicRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"l\n" +
+	"\x12SyncMessageRequest\x12\x19\n" +
+	"\btopic_id\x18\x01 \x01(\x03R\atopicId\x12\x17\n" +
+	"\apost_id\x18\x02 \x01(\x03R\x06postId\x12\"\n" +
+	"\x04post\x18\x03 \x01(\v2\x0e.proto.MessageR\x04post\"d\n" +
+	"\x0fSyncLikeRequest\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x19\n" +
+	"\btopic_id\x18\x03 \x01(\x03R\atopicId*\"\n" +
 	"\x06OpType\x12\v\n" +
 	"\aOP_POST\x10\x00\x12\v\n" +
 	"\aOP_LIKE\x10\x012\xd6\x05\n" +
@@ -1144,11 +1383,17 @@ const file_proto_razpravljalnica_proto_rawDesc = "" +
 	"\n" +
 	"ListTopics\x12\x16.google.protobuf.Empty\x1a\x19.proto.ListTopicsResponse\x12D\n" +
 	"\vGetMessages\x12\x19.proto.GetMessagesRequest\x1a\x1a.proto.GetMessagesResponse\x12E\n" +
-	"\x0eSubscribeTopic\x12\x1c.proto.SubscribeTopicRequest\x1a\x13.proto.MessageEvent0\x01\x126\n" +
-	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x12N\n" +
-	"\x14GenerateSubscription\x12\x1e.proto.SubscriptionNodeRequest\x1a\x16.google.protobuf.Empty2Y\n" +
+	"\x0eSubscribeTopic\x12\x1c.proto.SubscribeTopicRequest\x1a\x13.proto.MessageEvent0\x01\x12N\n" +
+	"\x14GenerateSubscription\x12\x1e.proto.SubscriptionNodeRequest\x1a\x16.google.protobuf.Empty\x126\n" +
+	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty2Y\n" +
 	"\fControlPlane\x12I\n" +
-	"\x0fGetClusterState\x12\x16.google.protobuf.Empty\x1a\x1e.proto.GetClusterStateResponseB\x12Z\x10/razpravljalnicab\x06proto3"
+	"\x0fGetClusterState\x12\x16.google.protobuf.Empty\x1a\x1e.proto.GetClusterStateResponse2\xbe\x02\n" +
+	"\bsyncData\x12:\n" +
+	"\bSyncUser\x12\x16.proto.SyncUserRequest\x1a\x16.google.protobuf.Empty\x12<\n" +
+	"\tSyncTopic\x12\x17.proto.SyncTopicRequest\x1a\x16.google.protobuf.Empty\x12@\n" +
+	"\vSyncMessage\x12\x19.proto.SyncMessageRequest\x1a\x16.google.protobuf.Empty\x12:\n" +
+	"\bSyncLike\x12\x16.proto.SyncLikeRequest\x1a\x16.google.protobuf.Empty\x12:\n" +
+	"\bSyncPing\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\x12Z\x10/razpravljalnicab\x06proto3"
 
 var (
 	file_proto_razpravljalnica_proto_rawDescOnce sync.Once
@@ -1163,7 +1408,7 @@ func file_proto_razpravljalnica_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_razpravljalnica_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_razpravljalnica_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_proto_razpravljalnica_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_proto_razpravljalnica_proto_goTypes = []any{
 	(OpType)(0),                      // 0: proto.OpType
 	(*User)(nil),                     // 1: proto.User
@@ -1184,49 +1429,64 @@ var file_proto_razpravljalnica_proto_goTypes = []any{
 	(*SubscriptionNodeResponse)(nil), // 16: proto.SubscriptionNodeResponse
 	(*MessageEvent)(nil),             // 17: proto.MessageEvent
 	(*GetClusterStateResponse)(nil),  // 18: proto.GetClusterStateResponse
-	(*timestamppb.Timestamp)(nil),    // 19: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),            // 20: google.protobuf.Empty
+	(*SyncUserRequest)(nil),          // 19: proto.SyncUserRequest
+	(*SyncTopicRequest)(nil),         // 20: proto.SyncTopicRequest
+	(*SyncMessageRequest)(nil),       // 21: proto.SyncMessageRequest
+	(*SyncLikeRequest)(nil),          // 22: proto.SyncLikeRequest
+	(*timestamppb.Timestamp)(nil),    // 23: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),            // 24: google.protobuf.Empty
 }
 var file_proto_razpravljalnica_proto_depIdxs = []int32{
-	19, // 0: proto.Message.created_at:type_name -> google.protobuf.Timestamp
+	23, // 0: proto.Message.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 1: proto.UserResponse.user:type_name -> proto.User
 	2,  // 2: proto.ListTopicsResponse.topics:type_name -> proto.Topic
 	3,  // 3: proto.GetMessagesResponse.messages:type_name -> proto.Message
 	5,  // 4: proto.SubscriptionNodeResponse.node:type_name -> proto.NodeInfo
 	0,  // 5: proto.MessageEvent.op:type_name -> proto.OpType
 	3,  // 6: proto.MessageEvent.message:type_name -> proto.Message
-	19, // 7: proto.MessageEvent.event_at:type_name -> google.protobuf.Timestamp
+	23, // 7: proto.MessageEvent.event_at:type_name -> google.protobuf.Timestamp
 	5,  // 8: proto.GetClusterStateResponse.head:type_name -> proto.NodeInfo
 	5,  // 9: proto.GetClusterStateResponse.tail:type_name -> proto.NodeInfo
-	7,  // 10: proto.MessageBoard.CreateUser:input_type -> proto.CreateUserRequest
-	8,  // 11: proto.MessageBoard.CreateTopic:input_type -> proto.CreateTopicRequest
-	9,  // 12: proto.MessageBoard.PostMessage:input_type -> proto.PostMessageRequest
-	10, // 13: proto.MessageBoard.LikeMessage:input_type -> proto.LikeMessageRequest
-	15, // 14: proto.MessageBoard.GetSubscriptionNode:input_type -> proto.SubscriptionNodeRequest
-	20, // 15: proto.MessageBoard.GetUsers:input_type -> google.protobuf.Empty
-	20, // 16: proto.MessageBoard.ListTopics:input_type -> google.protobuf.Empty
-	12, // 17: proto.MessageBoard.GetMessages:input_type -> proto.GetMessagesRequest
-	14, // 18: proto.MessageBoard.SubscribeTopic:input_type -> proto.SubscribeTopicRequest
-	20, // 19: proto.MessageBoard.Ping:input_type -> google.protobuf.Empty
+	3,  // 10: proto.SyncMessageRequest.post:type_name -> proto.Message
+	7,  // 11: proto.MessageBoard.CreateUser:input_type -> proto.CreateUserRequest
+	8,  // 12: proto.MessageBoard.CreateTopic:input_type -> proto.CreateTopicRequest
+	9,  // 13: proto.MessageBoard.PostMessage:input_type -> proto.PostMessageRequest
+	10, // 14: proto.MessageBoard.LikeMessage:input_type -> proto.LikeMessageRequest
+	15, // 15: proto.MessageBoard.GetSubscriptionNode:input_type -> proto.SubscriptionNodeRequest
+	24, // 16: proto.MessageBoard.GetUsers:input_type -> google.protobuf.Empty
+	24, // 17: proto.MessageBoard.ListTopics:input_type -> google.protobuf.Empty
+	12, // 18: proto.MessageBoard.GetMessages:input_type -> proto.GetMessagesRequest
+	14, // 19: proto.MessageBoard.SubscribeTopic:input_type -> proto.SubscribeTopicRequest
 	15, // 20: proto.MessageBoard.GenerateSubscription:input_type -> proto.SubscriptionNodeRequest
-	20, // 21: proto.ControlPlane.GetClusterState:input_type -> google.protobuf.Empty
-	1,  // 22: proto.MessageBoard.CreateUser:output_type -> proto.User
-	2,  // 23: proto.MessageBoard.CreateTopic:output_type -> proto.Topic
-	3,  // 24: proto.MessageBoard.PostMessage:output_type -> proto.Message
-	3,  // 25: proto.MessageBoard.LikeMessage:output_type -> proto.Message
-	16, // 26: proto.MessageBoard.GetSubscriptionNode:output_type -> proto.SubscriptionNodeResponse
-	6,  // 27: proto.MessageBoard.GetUsers:output_type -> proto.UserResponse
-	11, // 28: proto.MessageBoard.ListTopics:output_type -> proto.ListTopicsResponse
-	13, // 29: proto.MessageBoard.GetMessages:output_type -> proto.GetMessagesResponse
-	17, // 30: proto.MessageBoard.SubscribeTopic:output_type -> proto.MessageEvent
-	20, // 31: proto.MessageBoard.Ping:output_type -> google.protobuf.Empty
-	20, // 32: proto.MessageBoard.GenerateSubscription:output_type -> google.protobuf.Empty
-	18, // 33: proto.ControlPlane.GetClusterState:output_type -> proto.GetClusterStateResponse
-	22, // [22:34] is the sub-list for method output_type
-	10, // [10:22] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	24, // 21: proto.MessageBoard.Ping:input_type -> google.protobuf.Empty
+	24, // 22: proto.ControlPlane.GetClusterState:input_type -> google.protobuf.Empty
+	19, // 23: proto.syncData.SyncUser:input_type -> proto.SyncUserRequest
+	20, // 24: proto.syncData.SyncTopic:input_type -> proto.SyncTopicRequest
+	21, // 25: proto.syncData.SyncMessage:input_type -> proto.SyncMessageRequest
+	22, // 26: proto.syncData.SyncLike:input_type -> proto.SyncLikeRequest
+	24, // 27: proto.syncData.SyncPing:input_type -> google.protobuf.Empty
+	1,  // 28: proto.MessageBoard.CreateUser:output_type -> proto.User
+	2,  // 29: proto.MessageBoard.CreateTopic:output_type -> proto.Topic
+	3,  // 30: proto.MessageBoard.PostMessage:output_type -> proto.Message
+	3,  // 31: proto.MessageBoard.LikeMessage:output_type -> proto.Message
+	16, // 32: proto.MessageBoard.GetSubscriptionNode:output_type -> proto.SubscriptionNodeResponse
+	6,  // 33: proto.MessageBoard.GetUsers:output_type -> proto.UserResponse
+	11, // 34: proto.MessageBoard.ListTopics:output_type -> proto.ListTopicsResponse
+	13, // 35: proto.MessageBoard.GetMessages:output_type -> proto.GetMessagesResponse
+	17, // 36: proto.MessageBoard.SubscribeTopic:output_type -> proto.MessageEvent
+	24, // 37: proto.MessageBoard.GenerateSubscription:output_type -> google.protobuf.Empty
+	24, // 38: proto.MessageBoard.Ping:output_type -> google.protobuf.Empty
+	18, // 39: proto.ControlPlane.GetClusterState:output_type -> proto.GetClusterStateResponse
+	24, // 40: proto.syncData.SyncUser:output_type -> google.protobuf.Empty
+	24, // 41: proto.syncData.SyncTopic:output_type -> google.protobuf.Empty
+	24, // 42: proto.syncData.SyncMessage:output_type -> google.protobuf.Empty
+	24, // 43: proto.syncData.SyncLike:output_type -> google.protobuf.Empty
+	24, // 44: proto.syncData.SyncPing:output_type -> google.protobuf.Empty
+	28, // [28:45] is the sub-list for method output_type
+	11, // [11:28] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_proto_razpravljalnica_proto_init() }
@@ -1240,9 +1500,9 @@ func file_proto_razpravljalnica_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_razpravljalnica_proto_rawDesc), len(file_proto_razpravljalnica_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   22,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   3,
 		},
 		GoTypes:           file_proto_razpravljalnica_proto_goTypes,
 		DependencyIndexes: file_proto_razpravljalnica_proto_depIdxs,

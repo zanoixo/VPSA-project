@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
@@ -42,6 +44,8 @@ type Client struct {
 	availableTopics    map[string]int64
 	idToTopic          map[int64]string
 	subToken           string
+	userLock           sync.Mutex
+	topicsLock         sync.Mutex
 }
 
 func (client *Client) CreateUser(name string) (*db.User, error) {
@@ -68,8 +72,12 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 		fmt.Printf("Topic: %s created\n", createTopicResp.Name)
 	}
 
+	client.topicsLock.Lock()
+
 	client.availableTopics[name] = createTopicResp.Id
 	client.idToTopic[createTopicResp.Id] = name
+
+	client.topicsLock.Unlock()
 
 	return createTopicResp, nil
 }
@@ -121,6 +129,8 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 	listTopicsRes, err := client.msgBoardTailClient.ListTopics(context.Background(), listTopicsReq)
 
+	client.topicsLock.Lock()
+
 	if !checkError(err) {
 
 		for _, topic := range listTopicsRes.Topics {
@@ -133,6 +143,8 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 		return nil, err
 	}
+
+	client.topicsLock.Unlock()
 
 	return listTopicsRes, nil
 }
@@ -148,10 +160,14 @@ func (client *Client) ListTopics() (*db.ListTopicsResponse, error) {
 
 	fmt.Printf("Available topics:\n")
 
+	client.topicsLock.Lock()
+
 	for _, topic := range listTopicsRes.Topics {
 
 		fmt.Printf("Topic %s\n", topic.Name)
 	}
+
+	client.topicsLock.Unlock()
 
 	return listTopicsRes, err
 }
@@ -274,6 +290,8 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 
 	getUsersRes, err := client.msgBoardTailClient.GetUsers(context.Background(), getUsersReq)
 
+	client.userLock.Lock()
+
 	if !checkError(err) {
 
 		for _, user := range getUsersRes.User {
@@ -281,6 +299,8 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 			client.otherUsers[user.Id] = user.Name
 		}
 	}
+
+	client.userLock.Unlock()
 
 	return getUsersRes, nil
 }
@@ -305,6 +325,21 @@ func startClient(headUrl string, tailUrl string, name string) error {
 	client.availableTopics = make(map[string]int64)
 	client.idToTopic = map[int64]string{}
 	client.CreateUser(name)
+	client.CreateTopic("a")
+
+	time.Sleep(time.Second)
+	counter := 1
+	for j := 0; j < 10; j++ {
+		go func() {
+			for i := 0; i < 10000; i++ {
+				client.PostMessage(1, client.id, fmt.Sprintf("%d%d", i, j))
+				client.LikeMessage(1, int64(counter), client.id)
+				client.LikeMessage(1, int64(counter), client.id)
+				counter++
+			}
+		}()
+	}
+
 	client.GetUsers()
 
 	fmt.Printf("Welcome to razpravljalnica\n")

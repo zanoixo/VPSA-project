@@ -29,8 +29,8 @@ const (
 	MessageBoard_ListTopics_FullMethodName           = "/proto.MessageBoard/ListTopics"
 	MessageBoard_GetMessages_FullMethodName          = "/proto.MessageBoard/GetMessages"
 	MessageBoard_SubscribeTopic_FullMethodName       = "/proto.MessageBoard/SubscribeTopic"
-	MessageBoard_Ping_FullMethodName                 = "/proto.MessageBoard/Ping"
 	MessageBoard_GenerateSubscription_FullMethodName = "/proto.MessageBoard/GenerateSubscription"
+	MessageBoard_Ping_FullMethodName                 = "/proto.MessageBoard/Ping"
 )
 
 // MessageBoardClient is the client API for MessageBoard service.
@@ -54,8 +54,8 @@ type MessageBoardClient interface {
 	GetMessages(ctx context.Context, in *GetMessagesRequest, opts ...grpc.CallOption) (*GetMessagesResponse, error)
 	// Subscribe to topics; goes to the node returned by head
 	SubscribeTopic(ctx context.Context, in *SubscribeTopicRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MessageEvent], error)
-	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GenerateSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type messageBoardClient struct {
@@ -165,20 +165,20 @@ func (c *messageBoardClient) SubscribeTopic(ctx context.Context, in *SubscribeTo
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MessageBoard_SubscribeTopicClient = grpc.ServerStreamingClient[MessageEvent]
 
-func (c *messageBoardClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *messageBoardClient) GenerateSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, MessageBoard_Ping_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, MessageBoard_GenerateSubscription_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *messageBoardClient) GenerateSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *messageBoardClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, MessageBoard_GenerateSubscription_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, MessageBoard_Ping_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +206,8 @@ type MessageBoardServer interface {
 	GetMessages(context.Context, *GetMessagesRequest) (*GetMessagesResponse, error)
 	// Subscribe to topics; goes to the node returned by head
 	SubscribeTopic(*SubscribeTopicRequest, grpc.ServerStreamingServer[MessageEvent]) error
-	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	GenerateSubscription(context.Context, *SubscriptionNodeRequest) (*emptypb.Empty, error)
+	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	mustEmbedUnimplementedMessageBoardServer()
 }
 
@@ -245,11 +245,11 @@ func (UnimplementedMessageBoardServer) GetMessages(context.Context, *GetMessages
 func (UnimplementedMessageBoardServer) SubscribeTopic(*SubscribeTopicRequest, grpc.ServerStreamingServer[MessageEvent]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeTopic not implemented")
 }
-func (UnimplementedMessageBoardServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
-}
 func (UnimplementedMessageBoardServer) GenerateSubscription(context.Context, *SubscriptionNodeRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateSubscription not implemented")
+}
+func (UnimplementedMessageBoardServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedMessageBoardServer) mustEmbedUnimplementedMessageBoardServer() {}
 func (UnimplementedMessageBoardServer) testEmbeddedByValue()                      {}
@@ -427,24 +427,6 @@ func _MessageBoard_SubscribeTopic_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MessageBoard_SubscribeTopicServer = grpc.ServerStreamingServer[MessageEvent]
 
-func _MessageBoard_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MessageBoardServer).Ping(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MessageBoard_Ping_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageBoardServer).Ping(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _MessageBoard_GenerateSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SubscriptionNodeRequest)
 	if err := dec(in); err != nil {
@@ -459,6 +441,24 @@ func _MessageBoard_GenerateSubscription_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MessageBoardServer).GenerateSubscription(ctx, req.(*SubscriptionNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MessageBoard_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MessageBoardServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MessageBoard_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MessageBoardServer).Ping(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -503,12 +503,12 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MessageBoard_GetMessages_Handler,
 		},
 		{
-			MethodName: "Ping",
-			Handler:    _MessageBoard_Ping_Handler,
-		},
-		{
 			MethodName: "GenerateSubscription",
 			Handler:    _MessageBoard_GenerateSubscription_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _MessageBoard_Ping_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -621,6 +621,266 @@ var ControlPlane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetClusterState",
 			Handler:    _ControlPlane_GetClusterState_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "proto/razpravljalnica.proto",
+}
+
+const (
+	SyncData_SyncUser_FullMethodName    = "/proto.syncData/SyncUser"
+	SyncData_SyncTopic_FullMethodName   = "/proto.syncData/SyncTopic"
+	SyncData_SyncMessage_FullMethodName = "/proto.syncData/SyncMessage"
+	SyncData_SyncLike_FullMethodName    = "/proto.syncData/SyncLike"
+	SyncData_SyncPing_FullMethodName    = "/proto.syncData/SyncPing"
+)
+
+// SyncDataClient is the client API for SyncData service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type SyncDataClient interface {
+	SyncUser(ctx context.Context, in *SyncUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Creates a new topic to which users can post messages
+	SyncTopic(ctx context.Context, in *SyncTopicRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Post a message to a topic; Succed only if the User and the Topic exist in the data base.
+	SyncMessage(ctx context.Context, in *SyncMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Like an existing message. Return the message with the new number of likes.
+	SyncLike(ctx context.Context, in *SyncLikeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SyncPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+}
+
+type syncDataClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSyncDataClient(cc grpc.ClientConnInterface) SyncDataClient {
+	return &syncDataClient{cc}
+}
+
+func (c *syncDataClient) SyncUser(ctx context.Context, in *SyncUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SyncData_SyncUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncDataClient) SyncTopic(ctx context.Context, in *SyncTopicRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SyncData_SyncTopic_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncDataClient) SyncMessage(ctx context.Context, in *SyncMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SyncData_SyncMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncDataClient) SyncLike(ctx context.Context, in *SyncLikeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SyncData_SyncLike_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncDataClient) SyncPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SyncData_SyncPing_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SyncDataServer is the server API for SyncData service.
+// All implementations must embed UnimplementedSyncDataServer
+// for forward compatibility.
+type SyncDataServer interface {
+	SyncUser(context.Context, *SyncUserRequest) (*emptypb.Empty, error)
+	// Creates a new topic to which users can post messages
+	SyncTopic(context.Context, *SyncTopicRequest) (*emptypb.Empty, error)
+	// Post a message to a topic; Succed only if the User and the Topic exist in the data base.
+	SyncMessage(context.Context, *SyncMessageRequest) (*emptypb.Empty, error)
+	// Like an existing message. Return the message with the new number of likes.
+	SyncLike(context.Context, *SyncLikeRequest) (*emptypb.Empty, error)
+	SyncPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	mustEmbedUnimplementedSyncDataServer()
+}
+
+// UnimplementedSyncDataServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSyncDataServer struct{}
+
+func (UnimplementedSyncDataServer) SyncUser(context.Context, *SyncUserRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncUser not implemented")
+}
+func (UnimplementedSyncDataServer) SyncTopic(context.Context, *SyncTopicRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncTopic not implemented")
+}
+func (UnimplementedSyncDataServer) SyncMessage(context.Context, *SyncMessageRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncMessage not implemented")
+}
+func (UnimplementedSyncDataServer) SyncLike(context.Context, *SyncLikeRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncLike not implemented")
+}
+func (UnimplementedSyncDataServer) SyncPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncPing not implemented")
+}
+func (UnimplementedSyncDataServer) mustEmbedUnimplementedSyncDataServer() {}
+func (UnimplementedSyncDataServer) testEmbeddedByValue()                  {}
+
+// UnsafeSyncDataServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SyncDataServer will
+// result in compilation errors.
+type UnsafeSyncDataServer interface {
+	mustEmbedUnimplementedSyncDataServer()
+}
+
+func RegisterSyncDataServer(s grpc.ServiceRegistrar, srv SyncDataServer) {
+	// If the following call panics, it indicates UnimplementedSyncDataServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SyncData_ServiceDesc, srv)
+}
+
+func _SyncData_SyncUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncUser(ctx, req.(*SyncUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncData_SyncTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncTopicRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncTopic(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncTopic_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncTopic(ctx, req.(*SyncTopicRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncData_SyncMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncMessage(ctx, req.(*SyncMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncData_SyncLike_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncLikeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncLike(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncLike_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncLike(ctx, req.(*SyncLikeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncData_SyncPing_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncPing(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncPing_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncPing(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SyncData_ServiceDesc is the grpc.ServiceDesc for SyncData service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SyncData_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.syncData",
+	HandlerType: (*SyncDataServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SyncUser",
+			Handler:    _SyncData_SyncUser_Handler,
+		},
+		{
+			MethodName: "SyncTopic",
+			Handler:    _SyncData_SyncTopic_Handler,
+		},
+		{
+			MethodName: "SyncMessage",
+			Handler:    _SyncData_SyncMessage_Handler,
+		},
+		{
+			MethodName: "SyncLike",
+			Handler:    _SyncData_SyncLike_Handler,
+		},
+		{
+			MethodName: "SyncPing",
+			Handler:    _SyncData_SyncPing_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

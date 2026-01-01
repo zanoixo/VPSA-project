@@ -80,9 +80,9 @@ service  MessageBoard{
   // Subscribe to topics; goes to the node returned by head
   rpc SubscribeTopic(SubscribeTopicRequest) returns (stream MessageEvent);
 
-  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
-
   rpc GenerateSubscription(SubscriptionNodeRequest) returns (google.protobuf.Empty);
+
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
 
 }
 
@@ -158,4 +158,44 @@ service ControlPlane {
 message GetClusterStateResponse {
   NodeInfo head = 1;
   NodeInfo tail = 2;
+}
+
+service syncData {
+
+  rpc SyncUser(SyncUserRequest) returns (google.protobuf.Empty);
+
+  // Creates a new topic to which users can post messages
+  rpc SyncTopic(SyncTopicRequest) returns (google.protobuf.Empty);
+
+  // Post a message to a topic; Succed only if the User and the Topic exist in the data base.
+  rpc SyncMessage(SyncMessageRequest) returns (google.protobuf.Empty);
+
+  // Like an existing message. Return the message with the new number of likes.
+  rpc SyncLike(SyncLikeRequest) returns (google.protobuf.Empty);
+
+  rpc SyncPing(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+}
+
+message SyncUserRequest {
+  int64  id = 1;
+  string name = 2;
+}
+
+message SyncTopicRequest {
+  int64 id = 1;
+  string name = 2;
+}
+
+message SyncMessageRequest {
+  int64 topic_id = 1;
+  int64 post_id = 2;
+  Message post = 3;
+  
+}
+
+message SyncLikeRequest {
+  int64 message_id = 1;
+  int64 user_id = 2;
+  int64 topic_id = 3;
 }
