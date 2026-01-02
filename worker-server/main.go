@@ -90,9 +90,28 @@ func (server *Server) SyncUser(ctx context.Context, req *db.SyncUserRequest) (*e
 
 	server.CRUDServer.userLock.Unlock()
 
+	server.CRUDServer.likesLock.Lock()
+
+	server.CRUDServer.userLikes[req.Id] = []int64{}
+
+	server.CRUDServer.likesLock.Unlock()
+
 	if !server.isTail {
 
-		server.syncDataService.SyncUser(context.Background(), req)
+		for {
+
+			_, err := server.syncDataService.SyncUser(context.Background(), req)
+
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync user on next server retrying %s with id: %d\n", req.Name, req.Id)
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
+		}
+
 	}
 
 	return nil, nil
@@ -104,22 +123,33 @@ func (server *Server) SyncTopic(ctx context.Context, req *db.SyncTopicRequest) (
 	fmt.Printf("[INFO]: Recieved sync topic request: %s with id %d\n", req.Name, req.Id)
 
 	server.CRUDServer.topicLock.Lock()
+	server.CRUDServer.postLock.Lock()
 
 	server.CRUDServer.topics[req.Name] = req.Id
 	server.CRUDServer.topicIndex++
-
-	server.CRUDServer.topicLock.Unlock()
-
-	server.CRUDServer.postLock.Lock()
 
 	server.CRUDServer.topicsPosts[req.Id] = make(map[int64]*db.Message)
 	server.CRUDServer.topicsPostsList[req.Id] = []*db.Message{}
 
 	server.CRUDServer.postLock.Unlock()
+	server.CRUDServer.topicLock.Unlock()
 
 	if !server.isTail {
 
-		server.syncDataService.SyncTopic(context.Background(), req)
+		for {
+
+			_, err := server.syncDataService.SyncTopic(context.Background(), req)
+
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync topic on next server retrying %s with id: %d\n", req.Name, req.Id)
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
+		}
+
 	}
 
 	return nil, nil
@@ -129,31 +159,65 @@ func (server *Server) SyncLike(ctx context.Context, req *db.SyncLikeRequest) (*e
 
 	fmt.Printf("[INFO]: Recieved sync like request: with user id: %d topicId: %d msgId: %d\n", req.UserId, req.TopicId, req.MessageId)
 
+	server.CRUDServer.postLock.Lock()
 	server.CRUDServer.likesLock.Lock()
 
-	server.CRUDServer.userLikes[req.UserId] = append(server.CRUDServer.userLikes[req.UserId], req.MessageId)
+	topic, topicExists := server.CRUDServer.topicsPosts[req.TopicId]
 
-	server.CRUDServer.likesLock.Unlock()
+	if !topicExists || topic == nil {
 
-	server.CRUDServer.postLock.Lock()
-
-	msg, err := server.CRUDServer.topicsPosts[req.TopicId][req.MessageId]
-
-	if !err && msg != nil {
-		server.CRUDServer.topicsPosts[req.TopicId][req.MessageId].Likes++
-
-	} else {
-
+		server.CRUDServer.likesLock.Unlock()
 		server.CRUDServer.postLock.Unlock()
+
+		fmt.Printf("Topic doesnt exist\n")
+		return nil, status.Error(codes.NotFound, "Topic doesnt exist")
+	}
+
+	msg, postExists := server.CRUDServer.topicsPosts[req.TopicId][req.MessageId]
+
+	if !postExists || msg == nil {
+
+		server.CRUDServer.likesLock.Unlock()
+		server.CRUDServer.postLock.Unlock()
+
+		fmt.Printf("Post doesnt exist\n")
 		return nil, status.Error(codes.NotFound, "Post doesnt exist")
 
 	}
 
+	_, usrExists := server.CRUDServer.userLikes[req.UserId]
+
+	if !usrExists {
+
+		server.CRUDServer.likesLock.Unlock()
+		server.CRUDServer.postLock.Unlock()
+
+		fmt.Printf("User doesnt exist\n")
+		return nil, status.Error(codes.NotFound, "User doesnt exist")
+	}
+
+	server.CRUDServer.userLikes[req.UserId] = append(server.CRUDServer.userLikes[req.UserId], req.MessageId)
+
+	server.CRUDServer.topicsPosts[req.TopicId][req.MessageId].Likes++
+
+	server.CRUDServer.likesLock.Unlock()
 	server.CRUDServer.postLock.Unlock()
 
 	if !server.isTail {
 
-		server.syncDataService.SyncLike(context.Background(), req)
+		for {
+			_, err := server.syncDataService.SyncLike(context.Background(), req)
+
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync like on next server retrying\n")
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
+		}
+
 	}
 
 	return nil, nil
@@ -165,6 +229,15 @@ func (server *Server) SyncMessage(ctx context.Context, req *db.SyncMessageReques
 
 	server.CRUDServer.postLock.Lock()
 
+	_, topicExists := server.CRUDServer.topicsPosts[req.TopicId]
+	_, topicListExists := server.CRUDServer.topicsPostsList[req.TopicId]
+
+	if !topicExists || !topicListExists {
+
+		server.CRUDServer.postLock.Unlock()
+		return nil, status.Error(codes.NotFound, "Topic doesnt exist")
+	}
+
 	server.CRUDServer.topicsPosts[req.TopicId][req.PostId] = req.Post
 	server.CRUDServer.topicsPostsList[req.TopicId] = append(server.CRUDServer.topicsPostsList[req.TopicId], req.Post)
 	server.CRUDServer.postIndex++
@@ -173,7 +246,20 @@ func (server *Server) SyncMessage(ctx context.Context, req *db.SyncMessageReques
 
 	if !server.isTail {
 
-		server.syncDataService.SyncMessage(context.Background(), req)
+		for {
+
+			_, err := server.syncDataService.SyncMessage(context.Background(), req)
+
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync message on next server retrying\n")
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
+		}
+
 	}
 
 	return nil, nil
@@ -190,8 +276,6 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 
 	userId, userExists := server.CRUDServer.users[req.Name]
 
-	server.CRUDServer.userLock.Unlock()
-
 	if userExists {
 
 		fmt.Printf("[INFO]: User exists returning user ID %d\n", userId)
@@ -201,28 +285,33 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 
 		fmt.Printf("[INFO]: Creating user with ID %d\n", server.CRUDServer.userIndex)
 
-		server.CRUDServer.userLock.Lock()
-
 		server.CRUDServer.users[req.Name] = server.CRUDServer.userIndex
 		currUser.Id = server.CRUDServer.userIndex
 		server.CRUDServer.userIndex++
 
 		server.CRUDServer.userLikes[currUser.Id] = []int64{}
 
-		server.CRUDServer.userLock.Unlock()
-
 	}
+	server.CRUDServer.userLock.Unlock()
 
 	if !server.isTail {
 
-		syncReq := &db.SyncUserRequest{Id: currUser.Id, Name: req.Name}
+		for {
 
-		_, err := server.syncDataService.SyncUser(context.Background(), syncReq)
+			syncReq := &db.SyncUserRequest{Id: currUser.Id, Name: req.Name}
 
-		if err != nil {
+			_, err := server.syncDataService.SyncUser(context.Background(), syncReq)
 
-			return nil, err
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync user on next server retrying %s with id: %d\n", syncReq.Name, syncReq.Id)
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
 		}
+
 	}
 
 	return &currUser, nil
@@ -239,30 +328,26 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 
 	topicId, topicExists := server.CRUDServer.topics[req.Name]
 
-	server.CRUDServer.topicLock.Unlock()
-
 	if topicExists {
 
+		server.CRUDServer.topicLock.Unlock()
 		fmt.Printf("[INFO]: Topic exists returning topic ID %d\n", topicId)
 		return nil, status.Error(codes.AlreadyExists, "Topic already exist")
 	} else {
 
 		fmt.Printf("[INFO]: Creating topic with ID %d\n", server.CRUDServer.topicIndex)
 
-		server.CRUDServer.topicLock.Lock()
+		server.CRUDServer.postLock.Lock()
 
 		server.CRUDServer.topics[req.Name] = server.CRUDServer.topicIndex
 		newTopic.Id = server.CRUDServer.topicIndex
 		server.CRUDServer.topicIndex++
 
-		server.CRUDServer.topicLock.Unlock()
-
-		server.CRUDServer.postLock.Lock()
-
 		server.CRUDServer.topicsPosts[newTopic.Id] = make(map[int64]*db.Message)
 		server.CRUDServer.topicsPostsList[newTopic.Id] = []*db.Message{}
 
 		server.CRUDServer.postLock.Unlock()
+		server.CRUDServer.topicLock.Unlock()
 
 	}
 
@@ -270,11 +355,18 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 
 		syncReq := &db.SyncTopicRequest{Id: newTopic.Id, Name: req.Name}
 
-		_, err := server.syncDataService.SyncTopic(context.Background(), syncReq)
+		for {
 
-		if err != nil {
+			_, err := server.syncDataService.SyncTopic(context.Background(), syncReq)
 
-			return nil, err
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync topic on next server retrying %s with id: %d\n", syncReq.Name, syncReq.Id)
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
 		}
 	}
 
@@ -295,14 +387,11 @@ func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageReques
 
 	_, topicExists := server.CRUDServer.topicsPosts[req.TopicId]
 
-	server.CRUDServer.postLock.Unlock()
-
 	if !topicExists {
 
+		server.CRUDServer.postLock.Unlock()
 		return nil, status.Error(codes.NotFound, "Topic doesnt exist")
 	}
-
-	server.CRUDServer.postLock.Lock()
 
 	newPost.Id = server.CRUDServer.postIndex
 	server.CRUDServer.topicsPosts[req.TopicId][server.CRUDServer.postIndex] = newPost
@@ -316,11 +405,18 @@ func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageReques
 
 		syncReq := &db.SyncMessageRequest{TopicId: req.TopicId, PostId: newPost.Id, Post: newPost}
 
-		_, err := server.syncDataService.SyncMessage(context.Background(), syncReq)
+		for {
 
-		if err != nil {
+			_, err := server.syncDataService.SyncMessage(context.Background(), syncReq)
 
-			return nil, err
+			if err != nil {
+
+				fmt.Printf("[INFO]: Failed to sync message on next server retrying\n")
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
 		}
 	}
 
@@ -349,11 +445,7 @@ func (server *Server) userExists(userId int64) string {
 
 func (server *Server) alreadyLiked(userId int64, messageId int64) bool {
 
-	server.CRUDServer.likesLock.Lock()
-
 	isLiked := slices.Contains(server.CRUDServer.userLikes[userId], messageId)
-
-	server.CRUDServer.likesLock.Unlock()
 
 	return isLiked
 }
@@ -362,41 +454,39 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 	fmt.Printf("[INFO]: Like message request recieved\n")
 
-	server.CRUDServer.postLock.Lock()
-
-	likedMsg, msgExists := server.CRUDServer.topicsPosts[req.TopicId][req.MessageId]
-
-	server.CRUDServer.postLock.Unlock()
-
-	if !msgExists {
-
-		fmt.Printf("[INFO]: Post doesnt exist\n")
-		return nil, status.Error(codes.NotFound, "Post doesnt exist")
-	}
-
 	if server.userExists(req.UserId) == "" {
 
 		fmt.Printf("[INFO]: User doesnt exist\n")
 		return nil, status.Error(codes.NotFound, "User doesnt exist")
 	}
 
+	server.CRUDServer.postLock.Lock()
+	server.CRUDServer.likesLock.Lock()
+
+	likedMsg, msgExists := server.CRUDServer.topicsPosts[req.TopicId][req.MessageId]
+
+	if !msgExists {
+
+		fmt.Printf("[INFO]: Post doesnt exist\n")
+		server.CRUDServer.likesLock.Unlock()
+		server.CRUDServer.postLock.Unlock()
+		return nil, status.Error(codes.NotFound, "Post doesnt exist")
+	}
+
 	if server.alreadyLiked(req.UserId, req.MessageId) {
 
 		fmt.Printf("[INFO]: Post already liked\n")
+		server.CRUDServer.likesLock.Unlock()
+		server.CRUDServer.postLock.Unlock()
 		return nil, status.Error(codes.NotFound, "Post already liked")
 	}
 
-	server.CRUDServer.postLock.Lock()
-
 	server.CRUDServer.topicsPosts[req.TopicId][req.MessageId].Likes++
-
-	server.CRUDServer.postLock.Unlock()
-
-	server.CRUDServer.likesLock.Lock()
 
 	server.CRUDServer.userLikes[req.UserId] = append(server.CRUDServer.userLikes[req.UserId], req.MessageId)
 
 	server.CRUDServer.likesLock.Unlock()
+	server.CRUDServer.postLock.Unlock()
 
 	fmt.Printf("[INFO]: Post liked\n")
 
@@ -404,11 +494,17 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 		syncReq := &db.SyncLikeRequest{MessageId: req.MessageId, UserId: req.UserId, TopicId: req.TopicId}
 
-		_, err := server.syncDataService.SyncLike(context.Background(), syncReq)
+		for {
+			_, err := server.syncDataService.SyncLike(context.Background(), syncReq)
 
-		if err != nil {
+			if err != nil {
 
-			return nil, err
+				fmt.Printf("[INFO]: Failed to sync like on next server retrying\n")
+				time.Sleep(100 * time.Millisecond)
+			} else {
+
+				break
+			}
 		}
 	}
 
@@ -462,14 +558,16 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 		return nil, status.Error(codes.NotFound, "User doesnt exist")
 	}
 
-	server.subNodeLock.Lock()
-
 	subNode := &db.NodeInfo{}
 
 	for {
 
+		server.subNodeLock.Lock()
+
 		subNode = server.nodes[server.nextSub]
 		server.nextSub = (server.nextSub + 1) % server.numOfServer
+
+		server.subNodeLock.Unlock()
 
 		nextSubConn, _ := grpc.NewClient(subNode.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		server.msgBoardSubGen = db.NewMessageBoardClient(nextSubConn)
@@ -482,9 +580,8 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 		}
 
 		fmt.Printf("[INFO] can't connect to %s\n", subNode.Address)
-	}
 
-	server.subNodeLock.Unlock()
+	}
 
 	userToken := sha256.Sum256([]byte(user))
 
@@ -595,25 +692,25 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 
 	fmt.Printf("[INFO]: recieved subscription request\n")
 
-	server.CRUDServer.userSubscriptionLock.Lock()
-
-	_, userPermited := server.CRUDServer.userSubscription[req.SubscribeToken]
-
-	server.CRUDServer.userSubscriptionLock.Unlock()
-
 	if server.userExists(req.UserId) == "" {
 
 		fmt.Printf("[INFO]: User doesnt exist\n")
 		return status.Error(codes.NotFound, "User doesnt exist")
 	}
 
+	server.CRUDServer.userSubscriptionLock.Lock()
+
+	_, userPermited := server.CRUDServer.userSubscription[req.SubscribeToken]
+
 	if !userPermited {
 
+		server.CRUDServer.userSubscriptionLock.Unlock()
 		return status.Error(codes.PermissionDenied, "This user hasnt been authorized to subscribe to this topic")
 	}
 
 	if req.FromMessageId < 1 {
 
+		server.CRUDServer.userSubscriptionLock.Unlock()
 		return status.Error(codes.InvalidArgument, "Starting message id has to be a value above 0")
 	}
 
@@ -621,12 +718,11 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 
 	if err != 0 {
 
+		server.CRUDServer.userSubscriptionLock.Unlock()
 		return status.Error(codes.NotFound, "Requested topic doesnt exist")
 	}
 
 	sendNewSubscriptions := []SubscriptionData{}
-
-	server.CRUDServer.userSubscriptionLock.Lock()
 
 	for _, newTopic := range req.TopicId {
 
@@ -656,6 +752,8 @@ func (server *Server) SubscribeTopic(req *db.SubscribeTopicRequest, stream db.Me
 		}
 
 	}
+
+	server.CRUDServer.userSubscriptionLock.Unlock()
 
 	for _, newSub := range sendNewSubscriptions {
 

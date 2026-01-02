@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
 	"google.golang.org/grpc"
@@ -70,6 +69,9 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 
 	if !checkError(err) {
 		fmt.Printf("Topic: %s created\n", createTopicResp.Name)
+	} else {
+
+		return nil, status.Error(codes.AlreadyExists, "Topic already exists")
 	}
 
 	client.topicsLock.Lock()
@@ -325,20 +327,6 @@ func startClient(headUrl string, tailUrl string, name string) error {
 	client.availableTopics = make(map[string]int64)
 	client.idToTopic = map[int64]string{}
 	client.CreateUser(name)
-	client.CreateTopic("a")
-
-	time.Sleep(time.Second)
-	counter := 1
-	for j := 0; j < 10; j++ {
-		go func() {
-			for i := 0; i < 10000; i++ {
-				client.PostMessage(1, client.id, fmt.Sprintf("%d%d", i, j))
-				client.LikeMessage(1, int64(counter), client.id)
-				client.LikeMessage(1, int64(counter), client.id)
-				counter++
-			}
-		}()
-	}
 
 	client.GetUsers()
 
