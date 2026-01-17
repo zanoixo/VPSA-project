@@ -153,6 +153,31 @@ message MessageEvent {
 // Return the the head and the tail node address
 service ControlPlane {
   rpc GetClusterState(google.protobuf.Empty) returns (GetClusterStateResponse);
+
+  rpc ControlPing(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  rpc SetTail(SetTailRequest) returns (google.protobuf.Empty);
+
+  rpc SetHead(SetHeadRequest) returns (google.protobuf.Empty);
+
+  rpc NewServer(NewServerRequest) returns (google.protobuf.Empty);
+
+  rpc SetNextServer(NextServerRequest) returns (google.protobuf.Empty);
+}
+
+message NextServerRequest {
+  NodeInfo next_server = 1;
+}
+
+message NewServerRequest {
+  NodeInfo new_server = 1;
+}
+message SetTailRequest {
+  bool tail = 1;
+}
+
+message SetHeadRequest {
+  bool head = 1;
 }
 
 message GetClusterStateResponse {

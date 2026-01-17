@@ -19,10 +19,16 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func checkError(err error) bool {
+func checkError(err error, client *Client) bool {
 
 	if err != nil {
 		fmt.Printf("[ERROR]: %s\n", err)
+
+		if status.Code(err) == codes.PermissionDenied {
+
+			fmt.Printf("[ERROR]: Retrying connection to the servers\n")
+			client.controlClient.GetClusterState(context.Background(), &emptypb.Empty{})
+		}
 		return true
 	}
 
@@ -53,7 +59,7 @@ func (client *Client) CreateUser(name string) (*db.User, error) {
 
 	createUsrResp, err := client.msgBoardHeadClient.CreateUser(context.Background(), createUsrReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 		client.id = createUsrResp.Id
 	}
 
@@ -67,7 +73,7 @@ func (client *Client) CreateTopic(name string) (*db.Topic, error) {
 
 	createTopicResp, err := client.msgBoardHeadClient.CreateTopic(context.Background(), newTopicReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 		fmt.Printf("Topic: %s created\n", createTopicResp.Name)
 	} else {
 
@@ -90,7 +96,7 @@ func (client *Client) PostMessage(topicID, userID int64, text string) (*db.Messa
 
 	PostResp, err := client.msgBoardHeadClient.PostMessage(context.Background(), newPostReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 		fmt.Printf("Post created: %s\n", PostResp.Text)
 	}
 
@@ -103,7 +109,7 @@ func (client *Client) LikeMessage(topicID, messageID, userID int64) (*db.Message
 
 	LikeResp, err := client.msgBoardHeadClient.LikeMessage(context.Background(), newLikeReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 
 		fmt.Printf("Post successfuly liked\n")
 	}
@@ -117,7 +123,7 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 
 	SubNodeResp, err := client.msgBoardHeadClient.GetSubscriptionNode(context.Background(), subNodeReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 
 		client.subToken = SubNodeResp.SubscribeToken
 	}
@@ -133,7 +139,7 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 	client.topicsLock.Lock()
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 
 		for _, topic := range listTopicsRes.Topics {
 
@@ -180,7 +186,7 @@ func (client *Client) GetMessages(topicID int64, fromMessageID int64, limit int3
 
 	msgResp, err := client.msgBoardTailClient.GetMessages(context.Background(), getMsgReq)
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 
 		for _, msg := range msgResp.Messages {
 
@@ -209,7 +215,7 @@ func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.S
 
 	msgStream, err := client.msgBoardSubClient.SubscribeTopic(context.Background(), req)
 
-	if checkError(err) {
+	if checkError(err, client) {
 
 		return err
 	}
@@ -218,13 +224,13 @@ func (client *Client) recvTopicEvents(msgEvents chan *db.MessageEvent, req *db.S
 
 		newMsg, err := msgStream.Recv()
 
-		checkError(err)
+		checkError(err, client)
 
 		if err == io.EOF {
 			return nil
 		}
 
-		checkError(err)
+		checkError(err, client)
 
 		msgEvents <- newMsg
 
@@ -258,7 +264,7 @@ func (client *Client) SubscribeTopic(topicIDs []int64, userID, fromMessageID int
 	fmt.Printf("Connecting to subscription server %s\n", subNode.Node.Address)
 	subConn, err := grpc.NewClient(subNode.Node.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	if checkError(err) {
+	if checkError(err, client) {
 
 		return nil, status.Error(codes.Unavailable, "Subscription server not available")
 	}
@@ -281,7 +287,21 @@ func (client *Client) GetClusterState() (*db.GetClusterStateResponse, error) {
 	clusterStateReq := &emptypb.Empty{}
 
 	clusterStateRes, err := client.controlClient.GetClusterState(context.Background(), clusterStateReq)
-	checkError(err)
+	checkError(err, client)
+
+	client.headServer = clusterStateRes.Head.Address
+	client.tailServer = clusterStateRes.Tail.Address
+
+	fmt.Printf("Connecting to head server %s\n", client.headServer)
+	headConn, err := grpc.NewClient(client.headServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	checkError(err, client)
+
+	fmt.Printf("Connecting to tail server %s\n", client.tailServer)
+	tailConn, err := grpc.NewClient(client.tailServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	checkError(err, client)
+
+	client.msgBoardHeadClient = db.NewMessageBoardClient(headConn)
+	client.msgBoardTailClient = db.NewMessageBoardClient(tailConn)
 
 	return clusterStateRes, nil
 }
@@ -294,7 +314,7 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 
 	client.userLock.Lock()
 
-	if !checkError(err) {
+	if !checkError(err, client) {
 
 		for _, user := range getUsersRes.User {
 
@@ -307,20 +327,18 @@ func (client *Client) GetUsers() (*db.UserResponse, error) {
 	return getUsersRes, nil
 }
 
-func startClient(headUrl string, tailUrl string, name string) error {
+func startClient(controlUrl string, name string) error {
 
 	client := Client{}
 
-	fmt.Printf("Connecting to head server %s\n", headUrl)
-	headConn, err := grpc.NewClient(headUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	checkError(err)
+	fmt.Printf("Connecting to control server %s\n", controlUrl)
+	controlConn, err := grpc.NewClient(controlUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	checkError(err, &client)
 
-	fmt.Printf("Connecting to tail server %s\n", tailUrl)
-	tailConn, err := grpc.NewClient(tailUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	checkError(err)
+	_, err = client.controlClient.GetClusterState(context.Background(), &emptypb.Empty{})
+	checkError(err, &client)
 
-	client.msgBoardHeadClient = db.NewMessageBoardClient(headConn)
-	client.msgBoardTailClient = db.NewMessageBoardClient(tailConn)
+	client.controlClient = db.NewControlPlaneClient(controlConn)
 	client.msgBoardSubClient = nil
 	client.name = name
 	client.otherUsers = make(map[int64]string)
@@ -475,14 +493,12 @@ func startClient(headUrl string, tailUrl string, name string) error {
 func main() {
 
 	iPtr := flag.String("ip", "localhost", "server IP")
-	hpPtr := flag.Int("hp", 6000, "head server port")
-	tpPtr := flag.Int("tp", 6000, "tail server port")
+	pPtr := flag.Int("hp", 6000, "control server port")
 	nPtr := flag.String("n", "noName", "name of client")
 	flag.Parse()
 
-	headUrl := fmt.Sprintf("%v:%v", *iPtr, *hpPtr)
-	tailUrl := fmt.Sprintf("%v:%v", *iPtr, *tpPtr)
+	controlUrl := fmt.Sprintf("%v:%v", *iPtr, *pPtr)
 
-	startClient(headUrl, tailUrl, *nPtr)
+	startClient(controlUrl, *nPtr)
 
 }

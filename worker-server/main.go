@@ -30,6 +30,7 @@ type SubscriptionData struct {
 type Server struct {
 	db.UnimplementedMessageBoardServer
 	db.UnimplementedSyncDataServer
+	db.UnimplementedControlPlaneServer
 	CRUDServer      *ServerDataBase
 	syncDataService db.SyncDataClient
 	msgBoardSubGen  db.MessageBoardClient
@@ -75,6 +76,32 @@ func (server *Server) Ping(ctx context.Context, req *emptypb.Empty) (*emptypb.Em
 }
 
 func (server *Server) SyncPing(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+
+	return &emptypb.Empty{}, nil
+}
+
+func (server *Server) ControlPing(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+
+	return &emptypb.Empty{}, nil
+}
+
+func (server *Server) SetTail(ctx context.Context, req *db.SetTailRequest) (*emptypb.Empty, error) {
+
+	server.isTail = req.Tail
+	return &emptypb.Empty{}, nil
+}
+
+func (server *Server) SetHead(ctx context.Context, req *db.SetHeadRequest) (*emptypb.Empty, error) {
+
+	server.isHead = req.Head
+	return &emptypb.Empty{}, nil
+}
+
+func (server *Server) SetNextServer(ctx context.Context, req *db.NextServerRequest) (*emptypb.Empty, error) {
+
+	server.nextServerUrl = req.NextServer.Address
+
+	go server.connectToNextServer()
 
 	return &emptypb.Empty{}, nil
 }
@@ -893,6 +920,30 @@ func checkError(err error) {
 
 }
 
+func (server *Server) connectToNextServer() {
+
+	fmt.Printf("[INFO]: Trying to connect to the next server in chain\n")
+
+	for {
+
+		nextConn, _ := grpc.NewClient(server.nextServerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		server.syncDataService = db.NewSyncDataClient(nextConn)
+
+		_, err := server.syncDataService.SyncPing(context.Background(), &emptypb.Empty{})
+
+		if err == nil {
+
+			fmt.Printf("[INFO]: Successfully connected to the next server in chain\n")
+
+			break
+		} else {
+
+			fmt.Printf("[INFO]: Failed to connect to the next server in chain retrying\n")
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+
 func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, numOfServers int) {
 
 	currUrl := fmt.Sprintf("%v:%v", ip, port)
@@ -930,28 +981,8 @@ func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, n
 
 		server.nextServerUrl = fmt.Sprintf("%v:%v", ip, port+1)
 
-		go func() {
-			fmt.Printf("[INFO]: Trying to connect to the next server in chain\n")
+		go server.connectToNextServer()
 
-			for {
-
-				nextConn, _ := grpc.NewClient(server.nextServerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
-				server.syncDataService = db.NewSyncDataClient(nextConn)
-
-				_, err := server.syncDataService.SyncPing(context.Background(), &emptypb.Empty{})
-
-				if err == nil {
-
-					fmt.Printf("[INFO]: Successfully connected to the next server in chain\n")
-
-					break
-				} else {
-
-					fmt.Printf("[INFO]: Failed to connect to the next server in chain retrying\n")
-					time.Sleep(2 * time.Second)
-				}
-			}
-		}()
 	} else {
 
 		server.nextServerUrl = ""

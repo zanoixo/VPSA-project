@@ -523,6 +523,11 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	ControlPlane_GetClusterState_FullMethodName = "/proto.ControlPlane/GetClusterState"
+	ControlPlane_ControlPing_FullMethodName     = "/proto.ControlPlane/ControlPing"
+	ControlPlane_SetTail_FullMethodName         = "/proto.ControlPlane/SetTail"
+	ControlPlane_SetHead_FullMethodName         = "/proto.ControlPlane/SetHead"
+	ControlPlane_NewServer_FullMethodName       = "/proto.ControlPlane/NewServer"
+	ControlPlane_SetNextServer_FullMethodName   = "/proto.ControlPlane/SetNextServer"
 )
 
 // ControlPlaneClient is the client API for ControlPlane service.
@@ -532,6 +537,11 @@ const (
 // Return the the head and the tail node address
 type ControlPlaneClient interface {
 	GetClusterState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetClusterStateResponse, error)
+	ControlPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetTail(ctx context.Context, in *SetTailRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetHead(ctx context.Context, in *SetHeadRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SetNextServer(ctx context.Context, in *NextServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type controlPlaneClient struct {
@@ -552,6 +562,56 @@ func (c *controlPlaneClient) GetClusterState(ctx context.Context, in *emptypb.Em
 	return out, nil
 }
 
+func (c *controlPlaneClient) ControlPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ControlPlane_ControlPing_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) SetTail(ctx context.Context, in *SetTailRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ControlPlane_SetTail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) SetHead(ctx context.Context, in *SetHeadRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ControlPlane_SetHead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ControlPlane_NewServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) SetNextServer(ctx context.Context, in *NextServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ControlPlane_SetNextServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControlPlaneServer is the server API for ControlPlane service.
 // All implementations must embed UnimplementedControlPlaneServer
 // for forward compatibility.
@@ -559,6 +619,11 @@ func (c *controlPlaneClient) GetClusterState(ctx context.Context, in *emptypb.Em
 // Return the the head and the tail node address
 type ControlPlaneServer interface {
 	GetClusterState(context.Context, *emptypb.Empty) (*GetClusterStateResponse, error)
+	ControlPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	SetTail(context.Context, *SetTailRequest) (*emptypb.Empty, error)
+	SetHead(context.Context, *SetHeadRequest) (*emptypb.Empty, error)
+	NewServer(context.Context, *NewServerRequest) (*emptypb.Empty, error)
+	SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedControlPlaneServer()
 }
 
@@ -571,6 +636,21 @@ type UnimplementedControlPlaneServer struct{}
 
 func (UnimplementedControlPlaneServer) GetClusterState(context.Context, *emptypb.Empty) (*GetClusterStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetClusterState not implemented")
+}
+func (UnimplementedControlPlaneServer) ControlPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ControlPing not implemented")
+}
+func (UnimplementedControlPlaneServer) SetTail(context.Context, *SetTailRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetTail not implemented")
+}
+func (UnimplementedControlPlaneServer) SetHead(context.Context, *SetHeadRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetHead not implemented")
+}
+func (UnimplementedControlPlaneServer) NewServer(context.Context, *NewServerRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method NewServer not implemented")
+}
+func (UnimplementedControlPlaneServer) SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetNextServer not implemented")
 }
 func (UnimplementedControlPlaneServer) mustEmbedUnimplementedControlPlaneServer() {}
 func (UnimplementedControlPlaneServer) testEmbeddedByValue()                      {}
@@ -611,6 +691,96 @@ func _ControlPlane_GetClusterState_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControlPlane_ControlPing_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).ControlPing(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_ControlPing_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).ControlPing(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_SetTail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetTailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).SetTail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_SetTail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).SetTail(ctx, req.(*SetTailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_SetHead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetHeadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).SetHead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_SetHead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).SetHead(ctx, req.(*SetHeadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_NewServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NewServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).NewServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_NewServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).NewServer(ctx, req.(*NewServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_SetNextServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NextServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).SetNextServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_SetNextServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).SetNextServer(ctx, req.(*NextServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControlPlane_ServiceDesc is the grpc.ServiceDesc for ControlPlane service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -621,6 +791,26 @@ var ControlPlane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetClusterState",
 			Handler:    _ControlPlane_GetClusterState_Handler,
+		},
+		{
+			MethodName: "ControlPing",
+			Handler:    _ControlPlane_ControlPing_Handler,
+		},
+		{
+			MethodName: "SetTail",
+			Handler:    _ControlPlane_SetTail_Handler,
+		},
+		{
+			MethodName: "SetHead",
+			Handler:    _ControlPlane_SetHead_Handler,
+		},
+		{
+			MethodName: "NewServer",
+			Handler:    _ControlPlane_NewServer_Handler,
+		},
+		{
+			MethodName: "SetNextServer",
+			Handler:    _ControlPlane_SetNextServer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
