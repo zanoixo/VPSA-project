@@ -106,7 +106,10 @@ func (server *Server) SetNextServer(ctx context.Context, req *db.NextServerReque
 
 	server.nextServerUrl = req.NextServer.Address
 
-	go server.connectToNextServer()
+	if req.NextServer.Address != "" {
+
+		go server.connectToNextServer()
+	}
 
 	return &emptypb.Empty{}, nil
 }

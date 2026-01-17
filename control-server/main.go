@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	db "github.com/zanoixo/VPSA-project/razpravljalnica"
@@ -27,6 +28,7 @@ type ControlServer struct {
 	db.UnimplementedControlPlaneServer
 	ServerChain  *workerServer
 	ServersAlive map[string]int
+	chainLock    sync.Mutex
 }
 
 func checkError(err error) {
@@ -91,7 +93,19 @@ func (ControlServer *ControlServer) RemoveServer(nodeId string) {
 	if currServer.prevServer != nil {
 
 		currServer.prevServer.nextServer = currServer.nextServer
-		newNextServer := &db.NodeInfo{Address: currServer.nextServer.url, NodeId: currServer.nextServer.nodeId}
+
+		newNextServer := &db.NodeInfo{}
+
+		if currServer.nextServer == nil {
+
+			newNextServer.Address = ""
+			newNextServer.NodeId = ""
+
+		} else {
+			newNextServer.Address = currServer.nextServer.url
+			newNextServer.NodeId = currServer.nextServer.nodeId
+		}
+
 		currServer.prevServer.ControlClient.SetNextServer(context.Background(), &db.NextServerRequest{NextServer: newNextServer})
 
 	} else {
@@ -119,10 +133,13 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 
 	for {
 
+		ControlServer.chainLock.Lock()
+
 		currServer := ControlServer.ServerChain
 
 		if currServer == nil {
 
+			ControlServer.chainLock.Unlock()
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -133,7 +150,6 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 
 			if err != nil {
 
-				fmt.Printf("%s\n", err)
 				ControlServer.ServersAlive[currServer.nodeId] += 1
 			} else {
 
@@ -150,11 +166,14 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 			currServer = currServer.nextServer
 		}
 
+		ControlServer.chainLock.Unlock()
 		time.Sleep(500 * time.Millisecond)
 	}
 }
 
 func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewServerRequest) (*emptypb.Empty, error) {
+
+	ControlServer.chainLock.Lock()
 
 	currServer := ControlServer.ServerChain
 
@@ -195,6 +214,8 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 	}
 
 	ControlServer.ServersAlive[req.NewServer.NodeId] = 0
+
+	ControlServer.chainLock.Unlock()
 
 	return &emptypb.Empty{}, nil
 }

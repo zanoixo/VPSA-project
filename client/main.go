@@ -27,7 +27,7 @@ func checkError(err error, client *Client) bool {
 		if status.Code(err) == codes.PermissionDenied {
 
 			fmt.Printf("[ERROR]: Retrying connection to the servers\n")
-			client.controlClient.GetClusterState(context.Background(), &emptypb.Empty{})
+			client.GetClusterState()
 		}
 		return true
 	}
@@ -149,6 +149,7 @@ func (client *Client) updateTopicList() (*db.ListTopicsResponse, error) {
 
 	} else {
 
+		client.topicsLock.Unlock()
 		return nil, err
 	}
 
