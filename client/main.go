@@ -335,15 +335,15 @@ func startClient(controlUrl string, name string) error {
 	controlConn, err := grpc.NewClient(controlUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	checkError(err, &client)
 
-	_, err = client.controlClient.GetClusterState(context.Background(), &emptypb.Empty{})
-	checkError(err, &client)
-
 	client.controlClient = db.NewControlPlaneClient(controlConn)
 	client.msgBoardSubClient = nil
 	client.name = name
 	client.otherUsers = make(map[int64]string)
 	client.availableTopics = make(map[string]int64)
 	client.idToTopic = map[int64]string{}
+
+	client.GetClusterState()
+
 	client.CreateUser(name)
 
 	client.GetUsers()

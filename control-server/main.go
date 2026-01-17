@@ -61,6 +61,8 @@ func (ControlServer *ControlServer) GetHead() *workerServer {
 
 func (ControlServer *ControlServer) GetClusterState(ctx context.Context, _ *emptypb.Empty) (*db.GetClusterStateResponse, error) {
 
+	fmt.Printf("[INFO]: New cluster state request recieved\n")
+
 	head := ControlServer.GetHead()
 	tail := ControlServer.GetTail()
 
@@ -94,6 +96,7 @@ func (ControlServer *ControlServer) RemoveServer(nodeId string) {
 
 	} else {
 
+		fmt.Printf("[INFO]: New head request sent to server %s\n", currServer.nextServer.url)
 		currServer.nextServer.ControlClient.SetHead(context.Background(), &db.SetHeadRequest{Head: true})
 		ControlServer.ServerChain = currServer.nextServer
 	}
@@ -104,8 +107,11 @@ func (ControlServer *ControlServer) RemoveServer(nodeId string) {
 
 	} else {
 
+		fmt.Printf("[INFO]: New tail request sent to server %s\n", currServer.prevServer.url)
 		currServer.prevServer.ControlClient.SetTail(context.Background(), &db.SetTailRequest{Tail: true})
 	}
+
+	fmt.Printf("[INFO]: Removing server %s\n", currServer.url)
 
 }
 
@@ -127,6 +133,7 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 
 			if err != nil {
 
+				fmt.Printf("%s\n", err)
 				ControlServer.ServersAlive[currServer.nodeId] += 1
 			} else {
 
@@ -135,7 +142,9 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 
 			if ControlServer.ServersAlive[currServer.nodeId] >= 3 {
 
+				fmt.Printf("[INFO]: Server unresponsive removing: %s\n", currServer.url)
 				ControlServer.RemoveServer(currServer.nodeId)
+
 			}
 
 			currServer = currServer.nextServer
@@ -155,6 +164,8 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 	checkError(err) //replace with retry logic
 
+	fmt.Printf("[INFO]: adding new server %s\n", req.NewServer.Address)
+
 	if currServer == nil {
 
 		ControlServer.ServerChain = &workerServer{url: req.NewServer.Address, nodeId: req.NewServer.NodeId, prevServer: nil, nextServer: nil, ControlClient: newClient}
@@ -162,6 +173,9 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 		newClient.SetTail(context.Background(), &db.SetTailRequest{Tail: true})
 
 		newClient.SetHead(context.Background(), &db.SetHeadRequest{Head: true})
+
+		fmt.Printf("[INFO]: New tail request sent to server %s\n", req.NewServer.Address)
+		fmt.Printf("[INFO]: New head request sent to server %s\n", req.NewServer.Address)
 
 	} else {
 
@@ -171,10 +185,16 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 		tail.ControlClient.SetTail(context.Background(), &db.SetTailRequest{Tail: false})
 
+		fmt.Printf("[INFO]: Tail removal request sent to server %s\n", tail.url)
+
 		newClient.SetTail(context.Background(), &db.SetTailRequest{Tail: true})
+
+		fmt.Printf("[INFO]: New tail request sent to server %s\n", req.NewServer.Address)
 
 		tail.ControlClient.SetNextServer(context.Background(), &db.NextServerRequest{NextServer: req.NewServer})
 	}
+
+	ControlServer.ServersAlive[req.NewServer.NodeId] = 0
 
 	return &emptypb.Empty{}, nil
 }
@@ -188,6 +208,8 @@ func startServer(url string) {
 	controlServer.ServersAlive = make(map[string]int)
 
 	db.RegisterControlPlaneServer(grpcServer, &controlServer)
+
+	go controlServer.CheckWorkServers()
 
 	listener, err := net.Listen("tcp", url)
 	checkError(err)

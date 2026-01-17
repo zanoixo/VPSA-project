@@ -34,6 +34,7 @@ type Server struct {
 	CRUDServer      *ServerDataBase
 	syncDataService db.SyncDataClient
 	msgBoardSubGen  db.MessageBoardClient
+	controlClient   db.ControlPlaneClient
 
 	url    string
 	nodeId string
@@ -87,17 +88,21 @@ func (server *Server) ControlPing(ctx context.Context, req *emptypb.Empty) (*emp
 
 func (server *Server) SetTail(ctx context.Context, req *db.SetTailRequest) (*emptypb.Empty, error) {
 
+	fmt.Printf("[INFO]: Recieved set server tail request %t\n", req.Tail)
 	server.isTail = req.Tail
 	return &emptypb.Empty{}, nil
 }
 
 func (server *Server) SetHead(ctx context.Context, req *db.SetHeadRequest) (*emptypb.Empty, error) {
 
+	fmt.Printf("[INFO]: Recieved set server head request %t\n", req.Head)
 	server.isHead = req.Head
 	return &emptypb.Empty{}, nil
 }
 
 func (server *Server) SetNextServer(ctx context.Context, req *db.NextServerRequest) (*emptypb.Empty, error) {
+
+	fmt.Printf("[INFO]: Recieved next server request %s\n", req.NextServer.Address)
 
 	server.nextServerUrl = req.NextServer.Address
 
@@ -944,7 +949,15 @@ func (server *Server) connectToNextServer() {
 	}
 }
 
-func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, numOfServers int) {
+func (server *Server) newServer() {
+
+	time.Sleep(2 * time.Second)
+
+	newServerReq := &db.NewServerRequest{NewServer: &db.NodeInfo{Address: server.url, NodeId: server.nodeId}}
+	server.controlClient.NewServer(context.Background(), newServerReq)
+}
+
+func startServer(ip string, port int, nodeId string, controlUrl string) {
 
 	currUrl := fmt.Sprintf("%v:%v", ip, port)
 
@@ -970,30 +983,21 @@ func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, n
 	server.CRUDServer = &CRUD
 	server.url = currUrl
 	server.nodeId = nodeId
-	server.isHead = isHead
-	server.isTail = isTail
-	server.numOfServer = numOfServers
 	server.nextSub = 0
 
+	controlConn, _ := grpc.NewClient(controlUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	server.controlClient = db.NewControlPlaneClient(controlConn)
+
+	go server.newServer()
+
 	db.RegisterSyncDataServer(grpcServer, &server)
-
-	if !isTail {
-
-		server.nextServerUrl = fmt.Sprintf("%v:%v", ip, port+1)
-
-		go server.connectToNextServer()
-
-	} else {
-
-		server.nextServerUrl = ""
-	}
+	db.RegisterControlPlaneServer(grpcServer, &server)
+	db.RegisterMessageBoardServer(grpcServer, &server)
 
 	if server.isHead {
 
 		server.GenerateSubscriptionNodes(ip, port)
 	}
-
-	db.RegisterMessageBoardServer(grpcServer, &server)
 
 	listener, err := net.Listen("tcp", currUrl)
 	checkError(err)
@@ -1006,20 +1010,19 @@ func startServer(ip string, port int, nodeId string, isHead bool, isTail bool, n
 func main() {
 
 	iPtr := flag.String("ip", "localhost", "server IP")
-	pPtr := flag.Int("p", 6000, "server port")
+	pPtr := flag.Int("p", 6001, "server port")
+	ciPtr := flag.String("cip", "localhost", "control server IP")
+	cpPtr := flag.Int("cp", 6000, "control server port")
 	nPtr := flag.String("n", "0", "Node id")
-	hptr := flag.Bool("h", false, "Is the server a head server")
-	tptr := flag.Bool("t", false, "Is the server a tail server")
-	sptr := flag.Int("s", 4, "Number of servers")
-
 	flag.Parse()
 
 	ip := *iPtr
 	port := *pPtr
 	nodeId := *nPtr
-	isHead := *hptr
-	isTail := *tptr
-	numOfServers := *sptr
+	controlIp := *ciPtr
+	controlPort := *cpPtr
 
-	startServer(ip, port, nodeId, isHead, isTail, numOfServers)
+	controlUrl := fmt.Sprintf("%v:%v", controlIp, controlPort)
+
+	startServer(ip, port, nodeId, controlUrl)
 }
