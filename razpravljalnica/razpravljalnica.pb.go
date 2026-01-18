@@ -1557,28 +1557,29 @@ const file_proto_razpravljalnica_proto_rawDesc = "" +
 	"\btopic_id\x18\x03 \x01(\x03R\atopicId*\"\n" +
 	"\x06OpType\x12\v\n" +
 	"\aOP_POST\x10\x00\x12\v\n" +
-	"\aOP_LIKE\x10\x012\xd6\x05\n" +
+	"\aOP_LIKE\x10\x012\xd2\x05\n" +
 	"\fMessageBoard\x123\n" +
 	"\n" +
 	"CreateUser\x12\x18.proto.CreateUserRequest\x1a\v.proto.User\x126\n" +
 	"\vCreateTopic\x12\x19.proto.CreateTopicRequest\x1a\f.proto.Topic\x128\n" +
 	"\vPostMessage\x12\x19.proto.PostMessageRequest\x1a\x0e.proto.Message\x128\n" +
-	"\vLikeMessage\x12\x19.proto.LikeMessageRequest\x1a\x0e.proto.Message\x12V\n" +
-	"\x13GetSubscriptionNode\x12\x1e.proto.SubscriptionNodeRequest\x1a\x1f.proto.SubscriptionNodeResponse\x127\n" +
+	"\vLikeMessage\x12\x19.proto.LikeMessageRequest\x1a\x0e.proto.Message\x12R\n" +
+	"\x0fGetSubscription\x12\x1e.proto.SubscriptionNodeRequest\x1a\x1f.proto.SubscriptionNodeResponse\x127\n" +
 	"\bGetUsers\x12\x16.google.protobuf.Empty\x1a\x13.proto.UserResponse\x12?\n" +
 	"\n" +
 	"ListTopics\x12\x16.google.protobuf.Empty\x1a\x19.proto.ListTopicsResponse\x12D\n" +
 	"\vGetMessages\x12\x19.proto.GetMessagesRequest\x1a\x1a.proto.GetMessagesResponse\x12E\n" +
 	"\x0eSubscribeTopic\x12\x1c.proto.SubscribeTopicRequest\x1a\x13.proto.MessageEvent0\x01\x12N\n" +
 	"\x14GenerateSubscription\x12\x1e.proto.SubscriptionNodeRequest\x1a\x16.google.protobuf.Empty\x126\n" +
-	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty2\x8d\x03\n" +
+	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty2\xe5\x03\n" +
 	"\fControlPlane\x12I\n" +
 	"\x0fGetClusterState\x12\x16.google.protobuf.Empty\x1a\x1e.proto.GetClusterStateResponse\x12=\n" +
 	"\vControlPing\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x128\n" +
 	"\aSetTail\x12\x15.proto.SetTailRequest\x1a\x16.google.protobuf.Empty\x128\n" +
 	"\aSetHead\x12\x15.proto.SetHeadRequest\x1a\x16.google.protobuf.Empty\x12<\n" +
 	"\tNewServer\x12\x17.proto.NewServerRequest\x1a\x16.google.protobuf.Empty\x12A\n" +
-	"\rSetNextServer\x12\x18.proto.NextServerRequest\x1a\x16.google.protobuf.Empty2\xbe\x02\n" +
+	"\rSetNextServer\x12\x18.proto.NextServerRequest\x1a\x16.google.protobuf.Empty\x12V\n" +
+	"\x13GetSubscriptionNode\x12\x1e.proto.SubscriptionNodeRequest\x1a\x1f.proto.SubscriptionNodeResponse2\xbe\x02\n" +
 	"\bsyncData\x12:\n" +
 	"\bSyncUser\x12\x16.proto.SyncUserRequest\x1a\x16.google.protobuf.Empty\x12<\n" +
 	"\tSyncTopic\x12\x17.proto.SyncTopicRequest\x1a\x16.google.protobuf.Empty\x12@\n" +
@@ -1649,7 +1650,7 @@ var file_proto_razpravljalnica_proto_depIdxs = []int32{
 	8,  // 14: proto.MessageBoard.CreateTopic:input_type -> proto.CreateTopicRequest
 	9,  // 15: proto.MessageBoard.PostMessage:input_type -> proto.PostMessageRequest
 	10, // 16: proto.MessageBoard.LikeMessage:input_type -> proto.LikeMessageRequest
-	15, // 17: proto.MessageBoard.GetSubscriptionNode:input_type -> proto.SubscriptionNodeRequest
+	15, // 17: proto.MessageBoard.GetSubscription:input_type -> proto.SubscriptionNodeRequest
 	28, // 18: proto.MessageBoard.GetUsers:input_type -> google.protobuf.Empty
 	28, // 19: proto.MessageBoard.ListTopics:input_type -> google.protobuf.Empty
 	12, // 20: proto.MessageBoard.GetMessages:input_type -> proto.GetMessagesRequest
@@ -1662,35 +1663,37 @@ var file_proto_razpravljalnica_proto_depIdxs = []int32{
 	21, // 27: proto.ControlPlane.SetHead:input_type -> proto.SetHeadRequest
 	19, // 28: proto.ControlPlane.NewServer:input_type -> proto.NewServerRequest
 	18, // 29: proto.ControlPlane.SetNextServer:input_type -> proto.NextServerRequest
-	23, // 30: proto.syncData.SyncUser:input_type -> proto.SyncUserRequest
-	24, // 31: proto.syncData.SyncTopic:input_type -> proto.SyncTopicRequest
-	25, // 32: proto.syncData.SyncMessage:input_type -> proto.SyncMessageRequest
-	26, // 33: proto.syncData.SyncLike:input_type -> proto.SyncLikeRequest
-	28, // 34: proto.syncData.SyncPing:input_type -> google.protobuf.Empty
-	1,  // 35: proto.MessageBoard.CreateUser:output_type -> proto.User
-	2,  // 36: proto.MessageBoard.CreateTopic:output_type -> proto.Topic
-	3,  // 37: proto.MessageBoard.PostMessage:output_type -> proto.Message
-	3,  // 38: proto.MessageBoard.LikeMessage:output_type -> proto.Message
-	16, // 39: proto.MessageBoard.GetSubscriptionNode:output_type -> proto.SubscriptionNodeResponse
-	6,  // 40: proto.MessageBoard.GetUsers:output_type -> proto.UserResponse
-	11, // 41: proto.MessageBoard.ListTopics:output_type -> proto.ListTopicsResponse
-	13, // 42: proto.MessageBoard.GetMessages:output_type -> proto.GetMessagesResponse
-	17, // 43: proto.MessageBoard.SubscribeTopic:output_type -> proto.MessageEvent
-	28, // 44: proto.MessageBoard.GenerateSubscription:output_type -> google.protobuf.Empty
-	28, // 45: proto.MessageBoard.Ping:output_type -> google.protobuf.Empty
-	22, // 46: proto.ControlPlane.GetClusterState:output_type -> proto.GetClusterStateResponse
-	28, // 47: proto.ControlPlane.ControlPing:output_type -> google.protobuf.Empty
-	28, // 48: proto.ControlPlane.SetTail:output_type -> google.protobuf.Empty
-	28, // 49: proto.ControlPlane.SetHead:output_type -> google.protobuf.Empty
-	28, // 50: proto.ControlPlane.NewServer:output_type -> google.protobuf.Empty
-	28, // 51: proto.ControlPlane.SetNextServer:output_type -> google.protobuf.Empty
-	28, // 52: proto.syncData.SyncUser:output_type -> google.protobuf.Empty
-	28, // 53: proto.syncData.SyncTopic:output_type -> google.protobuf.Empty
-	28, // 54: proto.syncData.SyncMessage:output_type -> google.protobuf.Empty
-	28, // 55: proto.syncData.SyncLike:output_type -> google.protobuf.Empty
-	28, // 56: proto.syncData.SyncPing:output_type -> google.protobuf.Empty
-	35, // [35:57] is the sub-list for method output_type
-	13, // [13:35] is the sub-list for method input_type
+	15, // 30: proto.ControlPlane.GetSubscriptionNode:input_type -> proto.SubscriptionNodeRequest
+	23, // 31: proto.syncData.SyncUser:input_type -> proto.SyncUserRequest
+	24, // 32: proto.syncData.SyncTopic:input_type -> proto.SyncTopicRequest
+	25, // 33: proto.syncData.SyncMessage:input_type -> proto.SyncMessageRequest
+	26, // 34: proto.syncData.SyncLike:input_type -> proto.SyncLikeRequest
+	28, // 35: proto.syncData.SyncPing:input_type -> google.protobuf.Empty
+	1,  // 36: proto.MessageBoard.CreateUser:output_type -> proto.User
+	2,  // 37: proto.MessageBoard.CreateTopic:output_type -> proto.Topic
+	3,  // 38: proto.MessageBoard.PostMessage:output_type -> proto.Message
+	3,  // 39: proto.MessageBoard.LikeMessage:output_type -> proto.Message
+	16, // 40: proto.MessageBoard.GetSubscription:output_type -> proto.SubscriptionNodeResponse
+	6,  // 41: proto.MessageBoard.GetUsers:output_type -> proto.UserResponse
+	11, // 42: proto.MessageBoard.ListTopics:output_type -> proto.ListTopicsResponse
+	13, // 43: proto.MessageBoard.GetMessages:output_type -> proto.GetMessagesResponse
+	17, // 44: proto.MessageBoard.SubscribeTopic:output_type -> proto.MessageEvent
+	28, // 45: proto.MessageBoard.GenerateSubscription:output_type -> google.protobuf.Empty
+	28, // 46: proto.MessageBoard.Ping:output_type -> google.protobuf.Empty
+	22, // 47: proto.ControlPlane.GetClusterState:output_type -> proto.GetClusterStateResponse
+	28, // 48: proto.ControlPlane.ControlPing:output_type -> google.protobuf.Empty
+	28, // 49: proto.ControlPlane.SetTail:output_type -> google.protobuf.Empty
+	28, // 50: proto.ControlPlane.SetHead:output_type -> google.protobuf.Empty
+	28, // 51: proto.ControlPlane.NewServer:output_type -> google.protobuf.Empty
+	28, // 52: proto.ControlPlane.SetNextServer:output_type -> google.protobuf.Empty
+	16, // 53: proto.ControlPlane.GetSubscriptionNode:output_type -> proto.SubscriptionNodeResponse
+	28, // 54: proto.syncData.SyncUser:output_type -> google.protobuf.Empty
+	28, // 55: proto.syncData.SyncTopic:output_type -> google.protobuf.Empty
+	28, // 56: proto.syncData.SyncMessage:output_type -> google.protobuf.Empty
+	28, // 57: proto.syncData.SyncLike:output_type -> google.protobuf.Empty
+	28, // 58: proto.syncData.SyncPing:output_type -> google.protobuf.Empty
+	36, // [36:59] is the sub-list for method output_type
+	13, // [13:36] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name

@@ -24,7 +24,7 @@ const (
 	MessageBoard_CreateTopic_FullMethodName          = "/proto.MessageBoard/CreateTopic"
 	MessageBoard_PostMessage_FullMethodName          = "/proto.MessageBoard/PostMessage"
 	MessageBoard_LikeMessage_FullMethodName          = "/proto.MessageBoard/LikeMessage"
-	MessageBoard_GetSubscriptionNode_FullMethodName  = "/proto.MessageBoard/GetSubscriptionNode"
+	MessageBoard_GetSubscription_FullMethodName      = "/proto.MessageBoard/GetSubscription"
 	MessageBoard_GetUsers_FullMethodName             = "/proto.MessageBoard/GetUsers"
 	MessageBoard_ListTopics_FullMethodName           = "/proto.MessageBoard/ListTopics"
 	MessageBoard_GetMessages_FullMethodName          = "/proto.MessageBoard/GetMessages"
@@ -46,7 +46,7 @@ type MessageBoardClient interface {
 	// Like an existing message. Return the message with the new number of likes.
 	LikeMessage(ctx context.Context, in *LikeMessageRequest, opts ...grpc.CallOption) (*Message, error)
 	// Request a node to which a subscription can be opened.
-	GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error)
+	GetSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error)
 	GetUsers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*UserResponse, error)
 	// Returns all the topics
 	ListTopics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListTopicsResponse, error)
@@ -106,10 +106,10 @@ func (c *messageBoardClient) LikeMessage(ctx context.Context, in *LikeMessageReq
 	return out, nil
 }
 
-func (c *messageBoardClient) GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error) {
+func (c *messageBoardClient) GetSubscription(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SubscriptionNodeResponse)
-	err := c.cc.Invoke(ctx, MessageBoard_GetSubscriptionNode_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, MessageBoard_GetSubscription_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ type MessageBoardServer interface {
 	// Like an existing message. Return the message with the new number of likes.
 	LikeMessage(context.Context, *LikeMessageRequest) (*Message, error)
 	// Request a node to which a subscription can be opened.
-	GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error)
+	GetSubscription(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error)
 	GetUsers(context.Context, *emptypb.Empty) (*UserResponse, error)
 	// Returns all the topics
 	ListTopics(context.Context, *emptypb.Empty) (*ListTopicsResponse, error)
@@ -230,8 +230,8 @@ func (UnimplementedMessageBoardServer) PostMessage(context.Context, *PostMessage
 func (UnimplementedMessageBoardServer) LikeMessage(context.Context, *LikeMessageRequest) (*Message, error) {
 	return nil, status.Error(codes.Unimplemented, "method LikeMessage not implemented")
 }
-func (UnimplementedMessageBoardServer) GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetSubscriptionNode not implemented")
+func (UnimplementedMessageBoardServer) GetSubscription(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubscription not implemented")
 }
 func (UnimplementedMessageBoardServer) GetUsers(context.Context, *emptypb.Empty) (*UserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsers not implemented")
@@ -344,20 +344,20 @@ func _MessageBoard_LikeMessage_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MessageBoard_GetSubscriptionNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MessageBoard_GetSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SubscriptionNodeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MessageBoardServer).GetSubscriptionNode(ctx, in)
+		return srv.(MessageBoardServer).GetSubscription(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MessageBoard_GetSubscriptionNode_FullMethodName,
+		FullMethod: MessageBoard_GetSubscription_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MessageBoardServer).GetSubscriptionNode(ctx, req.(*SubscriptionNodeRequest))
+		return srv.(MessageBoardServer).GetSubscription(ctx, req.(*SubscriptionNodeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -487,8 +487,8 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MessageBoard_LikeMessage_Handler,
 		},
 		{
-			MethodName: "GetSubscriptionNode",
-			Handler:    _MessageBoard_GetSubscriptionNode_Handler,
+			MethodName: "GetSubscription",
+			Handler:    _MessageBoard_GetSubscription_Handler,
 		},
 		{
 			MethodName: "GetUsers",
@@ -522,12 +522,13 @@ var MessageBoard_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ControlPlane_GetClusterState_FullMethodName = "/proto.ControlPlane/GetClusterState"
-	ControlPlane_ControlPing_FullMethodName     = "/proto.ControlPlane/ControlPing"
-	ControlPlane_SetTail_FullMethodName         = "/proto.ControlPlane/SetTail"
-	ControlPlane_SetHead_FullMethodName         = "/proto.ControlPlane/SetHead"
-	ControlPlane_NewServer_FullMethodName       = "/proto.ControlPlane/NewServer"
-	ControlPlane_SetNextServer_FullMethodName   = "/proto.ControlPlane/SetNextServer"
+	ControlPlane_GetClusterState_FullMethodName     = "/proto.ControlPlane/GetClusterState"
+	ControlPlane_ControlPing_FullMethodName         = "/proto.ControlPlane/ControlPing"
+	ControlPlane_SetTail_FullMethodName             = "/proto.ControlPlane/SetTail"
+	ControlPlane_SetHead_FullMethodName             = "/proto.ControlPlane/SetHead"
+	ControlPlane_NewServer_FullMethodName           = "/proto.ControlPlane/NewServer"
+	ControlPlane_SetNextServer_FullMethodName       = "/proto.ControlPlane/SetNextServer"
+	ControlPlane_GetSubscriptionNode_FullMethodName = "/proto.ControlPlane/GetSubscriptionNode"
 )
 
 // ControlPlaneClient is the client API for ControlPlane service.
@@ -542,6 +543,7 @@ type ControlPlaneClient interface {
 	SetHead(ctx context.Context, in *SetHeadRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SetNextServer(ctx context.Context, in *NextServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error)
 }
 
 type controlPlaneClient struct {
@@ -612,6 +614,16 @@ func (c *controlPlaneClient) SetNextServer(ctx context.Context, in *NextServerRe
 	return out, nil
 }
 
+func (c *controlPlaneClient) GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubscriptionNodeResponse)
+	err := c.cc.Invoke(ctx, ControlPlane_GetSubscriptionNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControlPlaneServer is the server API for ControlPlane service.
 // All implementations must embed UnimplementedControlPlaneServer
 // for forward compatibility.
@@ -624,6 +636,7 @@ type ControlPlaneServer interface {
 	SetHead(context.Context, *SetHeadRequest) (*emptypb.Empty, error)
 	NewServer(context.Context, *NewServerRequest) (*emptypb.Empty, error)
 	SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error)
+	GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error)
 	mustEmbedUnimplementedControlPlaneServer()
 }
 
@@ -651,6 +664,9 @@ func (UnimplementedControlPlaneServer) NewServer(context.Context, *NewServerRequ
 }
 func (UnimplementedControlPlaneServer) SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetNextServer not implemented")
+}
+func (UnimplementedControlPlaneServer) GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubscriptionNode not implemented")
 }
 func (UnimplementedControlPlaneServer) mustEmbedUnimplementedControlPlaneServer() {}
 func (UnimplementedControlPlaneServer) testEmbeddedByValue()                      {}
@@ -781,6 +797,24 @@ func _ControlPlane_SetNextServer_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControlPlane_GetSubscriptionNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubscriptionNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).GetSubscriptionNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlane_GetSubscriptionNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).GetSubscriptionNode(ctx, req.(*SubscriptionNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControlPlane_ServiceDesc is the grpc.ServiceDesc for ControlPlane service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -811,6 +845,10 @@ var ControlPlane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetNextServer",
 			Handler:    _ControlPlane_SetNextServer_Handler,
+		},
+		{
+			MethodName: "GetSubscriptionNode",
+			Handler:    _ControlPlane_GetSubscriptionNode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

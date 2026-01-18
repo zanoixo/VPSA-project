@@ -576,14 +576,9 @@ func (server *Server) GenerateSubscription(ctx context.Context, req *db.Subscrip
 	return nil, nil
 }
 
-func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
+func (server *Server) GetSubscription(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
 
 	fmt.Printf("[INFO]: recieved getSubscription request\n")
-
-	if !server.isHead {
-
-		return nil, status.Error(codes.PermissionDenied, "Can't request a node from a server that isnt the head server")
-	}
 
 	user := server.userExists(req.UserId)
 
@@ -593,36 +588,13 @@ func (server *Server) GetSubscriptionNode(ctx context.Context, req *db.Subscript
 		return nil, status.Error(codes.NotFound, "User doesnt exist")
 	}
 
-	subNode := &db.NodeInfo{}
-
-	for {
-
-		server.subNodeLock.Lock()
-
-		subNode = server.nodes[server.nextSub]
-		server.nextSub = (server.nextSub + 1) % server.numOfServer
-
-		server.subNodeLock.Unlock()
-
-		nextSubConn, _ := grpc.NewClient(subNode.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		server.msgBoardSubGen = db.NewMessageBoardClient(nextSubConn)
-
-		_, err := server.msgBoardSubGen.Ping(context.Background(), &emptypb.Empty{})
-
-		if err == nil {
-
-			break
-		}
-
-		fmt.Printf("[INFO] can't connect to %s\n", subNode.Address)
-
-	}
+	subNode := &db.NodeInfo{Address: server.url, NodeId: server.nodeId}
 
 	userToken := sha256.Sum256([]byte(user))
 
 	subToken := hex.EncodeToString(userToken[:])
 
-	_, err := server.msgBoardSubGen.GenerateSubscription(context.Background(), req)
+	_, err := server.GenerateSubscription(context.Background(), req)
 
 	if err != nil {
 

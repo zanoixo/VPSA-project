@@ -26,9 +26,12 @@ type workerServer struct {
 
 type ControlServer struct {
 	db.UnimplementedControlPlaneServer
-	ServerChain  *workerServer
-	ServersAlive map[string]int
-	chainLock    sync.Mutex
+	ServerChain    *workerServer
+	ServersAlive   map[string]int
+	chainLock      sync.Mutex
+	numOfServers   int
+	nextSubServer  int
+	msgBoardClient db.MessageBoardClient
 }
 
 func checkError(err error) {
@@ -36,6 +39,47 @@ func checkError(err error) {
 	if err != nil {
 		panic(fmt.Sprintf("[ERROR]: %s", err))
 	}
+
+}
+
+func (controlServer *ControlServer) GetSubscriptionNode(ctx context.Context, req *db.SubscriptionNodeRequest) (*db.SubscriptionNodeResponse, error) {
+
+	fmt.Printf("[INFO]: recieved getSubscription request\n")
+
+	subNode := &db.NodeInfo{}
+
+	for {
+
+		currServer := controlServer.ServerChain
+
+		counter := 0
+
+		fmt.Printf("%d %d\n", controlServer.nextSubServer, controlServer.numOfServers)
+
+		for counter != controlServer.nextSubServer {
+
+			currServer = currServer.nextServer
+			counter++
+		}
+
+		nextSubConn, _ := grpc.NewClient(currServer.url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		controlServer.msgBoardClient = db.NewMessageBoardClient(nextSubConn)
+
+		_, err := controlServer.msgBoardClient.Ping(context.Background(), &emptypb.Empty{})
+
+		controlServer.nextSubServer = (controlServer.nextSubServer + 1) % controlServer.numOfServers
+		if err == nil {
+
+			break
+		}
+
+		fmt.Printf("[INFO] can't connect to %s\n", subNode.Address)
+
+	}
+
+	nodeResp, err := controlServer.msgBoardClient.GetSubscription(ctx, req)
+
+	return nodeResp, err
 
 }
 
@@ -159,6 +203,7 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 			if ControlServer.ServersAlive[currServer.nodeId] >= 3 {
 
 				fmt.Printf("[INFO]: Server unresponsive removing: %s\n", currServer.url)
+				ControlServer.numOfServers--
 				ControlServer.RemoveServer(currServer.nodeId)
 
 			}
@@ -214,6 +259,7 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 	}
 
 	ControlServer.ServersAlive[req.NewServer.NodeId] = 0
+	ControlServer.numOfServers++
 
 	ControlServer.chainLock.Unlock()
 
@@ -227,6 +273,8 @@ func startServer(url string) {
 
 	controlServer := ControlServer{}
 	controlServer.ServersAlive = make(map[string]int)
+	controlServer.nextSubServer = 0
+	controlServer.numOfServers = 0
 
 	db.RegisterControlPlaneServer(grpcServer, &controlServer)
 

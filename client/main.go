@@ -121,7 +121,7 @@ func (client *Client) GetSubscriptionNode(userID int64, topicIDs []int64) (*db.S
 
 	subNodeReq := &db.SubscriptionNodeRequest{UserId: userID, TopicId: topicIDs}
 
-	SubNodeResp, err := client.msgBoardHeadClient.GetSubscriptionNode(context.Background(), subNodeReq)
+	SubNodeResp, err := client.controlClient.GetSubscriptionNode(context.Background(), subNodeReq)
 
 	if !checkError(err, client) {
 
@@ -245,6 +245,11 @@ func (client *Client) displayNewEvents(msgEvents chan *db.MessageEvent) {
 
 		fmt.Print("\r")
 		fmt.Print("\033[K")
+
+		if newEvent == nil {
+			fmt.Printf("[ERROR]: something went wrong with the subscription server try resubscribing\n")
+			break
+		}
 
 		_, exists := client.otherUsers[newEvent.Message.UserId]
 

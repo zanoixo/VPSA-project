@@ -65,7 +65,7 @@ service  MessageBoard{
   rpc LikeMessage(LikeMessageRequest) returns (Message);
 
   // Request a node to which a subscription can be opened.
-  rpc GetSubscriptionNode(SubscriptionNodeRequest) returns (SubscriptionNodeResponse);
+  rpc GetSubscription(SubscriptionNodeRequest) returns (SubscriptionNodeResponse);
 
   // Reads go to the tail node
 
@@ -163,6 +163,8 @@ service ControlPlane {
   rpc NewServer(NewServerRequest) returns (google.protobuf.Empty);
 
   rpc SetNextServer(NextServerRequest) returns (google.protobuf.Empty);
+
+  rpc GetSubscriptionNode(SubscriptionNodeRequest) returns (SubscriptionNodeResponse);
 }
 
 message NextServerRequest {
