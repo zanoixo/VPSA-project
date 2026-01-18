@@ -861,6 +861,7 @@ const (
 	SyncData_SyncMessage_FullMethodName = "/proto.syncData/SyncMessage"
 	SyncData_SyncLike_FullMethodName    = "/proto.syncData/SyncLike"
 	SyncData_SyncPing_FullMethodName    = "/proto.syncData/SyncPing"
+	SyncData_SyncServer_FullMethodName  = "/proto.syncData/SyncServer"
 )
 
 // SyncDataClient is the client API for SyncData service.
@@ -875,6 +876,7 @@ type SyncDataClient interface {
 	// Like an existing message. Return the message with the new number of likes.
 	SyncLike(ctx context.Context, in *SyncLikeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SyncPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SyncServer(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncServerResponse, error)
 }
 
 type syncDataClient struct {
@@ -935,6 +937,16 @@ func (c *syncDataClient) SyncPing(ctx context.Context, in *emptypb.Empty, opts .
 	return out, nil
 }
 
+func (c *syncDataClient) SyncServer(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SyncServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncServerResponse)
+	err := c.cc.Invoke(ctx, SyncData_SyncServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SyncDataServer is the server API for SyncData service.
 // All implementations must embed UnimplementedSyncDataServer
 // for forward compatibility.
@@ -947,6 +959,7 @@ type SyncDataServer interface {
 	// Like an existing message. Return the message with the new number of likes.
 	SyncLike(context.Context, *SyncLikeRequest) (*emptypb.Empty, error)
 	SyncPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	SyncServer(context.Context, *emptypb.Empty) (*SyncServerResponse, error)
 	mustEmbedUnimplementedSyncDataServer()
 }
 
@@ -971,6 +984,9 @@ func (UnimplementedSyncDataServer) SyncLike(context.Context, *SyncLikeRequest) (
 }
 func (UnimplementedSyncDataServer) SyncPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncPing not implemented")
+}
+func (UnimplementedSyncDataServer) SyncServer(context.Context, *emptypb.Empty) (*SyncServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncServer not implemented")
 }
 func (UnimplementedSyncDataServer) mustEmbedUnimplementedSyncDataServer() {}
 func (UnimplementedSyncDataServer) testEmbeddedByValue()                  {}
@@ -1083,6 +1099,24 @@ func _SyncData_SyncPing_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SyncData_SyncServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncDataServer).SyncServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncData_SyncServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncDataServer).SyncServer(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SyncData_ServiceDesc is the grpc.ServiceDesc for SyncData service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1109,6 +1143,10 @@ var SyncData_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncPing",
 			Handler:    _SyncData_SyncPing_Handler,
+		},
+		{
+			MethodName: "SyncServer",
+			Handler:    _SyncData_SyncServer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -202,6 +202,8 @@ service syncData {
 
   rpc SyncPing(google.protobuf.Empty) returns (google.protobuf.Empty);
 
+  rpc SyncServer(google.protobuf.Empty) returns (SyncServerResponse);
+
 }
 
 message SyncUserRequest {
@@ -225,4 +227,48 @@ message SyncLikeRequest {
   int64 message_id = 1;
   int64 user_id = 2;
   int64 topic_id = 3;
+}
+
+message TopicPosts {
+  int64 topic_id = 1;
+  map<int64, Message> posts = 2; // postId -> Message
+}
+
+message TopicPostsList {
+  int64 topic_id = 1;
+  repeated Message posts = 2;
+}
+
+message UserLikes {
+  int64 user_id = 1;
+  repeated int64 message_ids = 2;
+}
+
+message SubscriptionData {
+  string topic_name = 1;
+  int64 topic_id = 2;
+}
+
+message UserSubscriptions {
+  string username = 1;
+  repeated SubscriptionData subscriptions = 2;
+}
+
+message SyncServerResponse {
+
+  map<string, int64> users = 1;
+  int64 user_index = 2;
+
+  map<string, int64> topics = 3;
+  int64 topic_index = 4;
+
+  repeated TopicPosts topics_posts = 5;
+
+  repeated TopicPostsList topics_posts_list = 6;
+
+  int64 post_index = 7;
+
+  repeated UserLikes user_likes = 8;
+
+  repeated UserSubscriptions user_subscriptions = 9;
 }

@@ -24,7 +24,7 @@ func checkError(err error, client *Client) bool {
 	if err != nil {
 		fmt.Printf("[ERROR]: %s\n", err)
 
-		if status.Code(err) == codes.PermissionDenied {
+		if status.Code(err) == codes.PermissionDenied || status.Code(err) == codes.Unavailable {
 
 			fmt.Printf("[ERROR]: Retrying connection to the servers\n")
 			client.GetClusterState()

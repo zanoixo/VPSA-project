@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"maps"
 	"net"
 	"slices"
 	"sort"
@@ -300,9 +301,116 @@ func (server *Server) SyncMessage(ctx context.Context, req *db.SyncMessageReques
 	return nil, nil
 }
 
+func convertUserLikes(src map[int64][]int64) []*db.UserLikes {
+
+	res := make([]*db.UserLikes, 0, len(src))
+
+	for userID, msgIDs := range src {
+		res = append(res, &db.UserLikes{UserId: userID, MessageIds: append([]int64(nil), msgIDs...)})
+	}
+
+	return res
+}
+
+func convertTopicsPosts(src map[int64]map[int64]*db.Message) []*db.TopicPosts {
+
+	res := make([]*db.TopicPosts, 0, len(src))
+
+	for topicID, posts := range src {
+
+		pbPosts := make(map[int64]*db.Message, len(posts))
+
+		for postID, msg := range posts {
+
+			if msg == nil {
+				continue
+			}
+
+			pbPosts[postID] = &db.Message{
+				Id:      msg.Id,
+				TopicId: msg.TopicId,
+				UserId:  msg.UserId,
+				Text:    msg.Text,
+				Likes:   msg.Likes,
+			}
+		}
+
+		res = append(res, &db.TopicPosts{TopicId: topicID, Posts: pbPosts})
+	}
+
+	return res
+}
+
+func convertTopicsPostsList(src map[int64][]*db.Message) []*db.TopicPostsList {
+
+	res := make([]*db.TopicPostsList, 0, len(src))
+
+	for topicID, posts := range src {
+
+		pbPosts := make([]*db.Message, 0, len(posts))
+
+		for _, msg := range posts {
+
+			if msg == nil {
+				continue
+			}
+
+			pbPosts = append(pbPosts, &db.Message{
+				Id:      msg.Id,
+				TopicId: msg.TopicId,
+				UserId:  msg.UserId,
+				Text:    msg.Text,
+				Likes:   msg.Likes,
+			})
+		}
+
+		res = append(res, &db.TopicPostsList{TopicId: topicID, Posts: pbPosts})
+	}
+
+	return res
+}
+
+func (server *Server) SyncServer(ctx context.Context, req *emptypb.Empty) (*db.SyncServerResponse, error) {
+
+	fmt.Printf("[INFO]: Recieved sync server request\n")
+
+	server.CRUDServer.userLock.Lock()
+	server.subNodeLock.Lock()
+	server.CRUDServer.topicLock.Lock()
+	server.CRUDServer.postLock.Lock()
+	server.CRUDServer.likesLock.Lock()
+
+	syncResp := db.SyncServerResponse{}
+
+	syncResp.Users = maps.Clone(server.CRUDServer.users)
+	syncResp.UserIndex = server.CRUDServer.userIndex
+
+	syncResp.Topics = maps.Clone(server.CRUDServer.topics)
+	syncResp.TopicIndex = server.CRUDServer.topicIndex
+
+	syncResp.TopicsPosts = convertTopicsPosts(server.CRUDServer.topicsPosts)
+	syncResp.TopicsPostsList = convertTopicsPostsList(server.CRUDServer.topicsPostsList)
+	syncResp.PostIndex = server.CRUDServer.postIndex
+
+	syncResp.UserLikes = convertUserLikes(server.CRUDServer.userLikes)
+
+	server.CRUDServer.likesLock.Unlock()
+	server.CRUDServer.postLock.Unlock()
+	server.CRUDServer.topicLock.Unlock()
+	server.subNodeLock.Unlock()
+	server.CRUDServer.userLock.Unlock()
+
+	return &syncResp, nil
+}
+
 func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest) (*db.User, error) {
 
 	fmt.Printf("[INFO]: Recieved create user request from %s\n", req.Name)
+
+	if !server.isHead {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to create user on a server that isn't the head server")
+	}
 
 	currUser := db.User{}
 	currUser.Name = req.Name
@@ -355,6 +463,11 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicRequest) (*db.Topic, error) {
 
 	fmt.Printf("[INFO]: Recieved create topic request: %s\n", req.Name)
+
+	if !server.isHead {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to create a topic on a server that isn't the head server")
+	}
 
 	newTopic := db.Topic{}
 	newTopic.Name = req.Name
@@ -411,6 +524,11 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageRequest) (*db.Message, error) {
 
 	fmt.Printf("[INFO]: Recieved create post request\n")
+
+	if !server.isHead {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to post a message on a server that isn't the head server")
+	}
 
 	newPost := &db.Message{}
 	newPost.Text = req.Text
@@ -488,6 +606,11 @@ func (server *Server) alreadyLiked(userId int64, messageId int64) bool {
 func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageRequest) (*db.Message, error) {
 
 	fmt.Printf("[INFO]: Like message request recieved\n")
+
+	if !server.isHead {
+
+		return nil, status.Error(codes.PermissionDenied, "Can't request to like a message on a server that isn't the head server")
+	}
 
 	if server.userExists(req.UserId) == "" {
 
@@ -922,6 +1045,88 @@ func (server *Server) connectToNextServer() {
 			time.Sleep(2 * time.Second)
 		}
 	}
+}
+
+func convertUserLikesReverse(src []*db.UserLikes) map[int64][]int64 {
+
+	res := make(map[int64][]int64, len(src))
+
+	for _, ul := range src {
+
+		if ul == nil {
+			continue
+		}
+
+		res[ul.UserId] = append([]int64(nil), ul.MessageIds...)
+	}
+
+	return res
+}
+
+func convertTopicsPostsReverse(src []*db.TopicPosts) map[int64]map[int64]*db.Message {
+
+	res := make(map[int64]map[int64]*db.Message, len(src))
+
+	for _, tp := range src {
+
+		if tp == nil {
+			continue
+		}
+
+		posts := make(map[int64]*db.Message, len(tp.Posts))
+
+		for postID, msg := range tp.Posts {
+
+			if msg == nil {
+				continue
+			}
+
+			posts[postID] = &db.Message{
+				Id:      msg.Id,
+				TopicId: msg.TopicId,
+				UserId:  msg.UserId,
+				Text:    msg.Text,
+				Likes:   msg.Likes,
+			}
+		}
+
+		res[tp.TopicId] = posts
+	}
+
+	return res
+}
+
+func convertTopicsPostsListReverse(src []*db.TopicPostsList) map[int64][]*db.Message {
+
+	res := make(map[int64][]*db.Message, len(src))
+
+	for _, tpl := range src {
+
+		if tpl == nil {
+			continue
+		}
+
+		posts := make([]*db.Message, 0, len(tpl.Posts))
+
+		for _, msg := range tpl.Posts {
+
+			if msg == nil {
+				continue
+			}
+
+			posts = append(posts, &db.Message{
+				Id:      msg.Id,
+				TopicId: msg.TopicId,
+				UserId:  msg.UserId,
+				Text:    msg.Text,
+				Likes:   msg.Likes,
+			})
+		}
+
+		res[tpl.TopicId] = posts
+	}
+
+	return res
 }
 
 func (server *Server) newServer() {
