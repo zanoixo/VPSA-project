@@ -541,7 +541,7 @@ type ControlPlaneClient interface {
 	ControlPing(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SetTail(ctx context.Context, in *SetTailRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SetHead(ctx context.Context, in *SetHeadRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*NewServerResponse, error)
 	SetNextServer(ctx context.Context, in *NextServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetSubscriptionNode(ctx context.Context, in *SubscriptionNodeRequest, opts ...grpc.CallOption) (*SubscriptionNodeResponse, error)
 }
@@ -594,9 +594,9 @@ func (c *controlPlaneClient) SetHead(ctx context.Context, in *SetHeadRequest, op
 	return out, nil
 }
 
-func (c *controlPlaneClient) NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *controlPlaneClient) NewServer(ctx context.Context, in *NewServerRequest, opts ...grpc.CallOption) (*NewServerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(NewServerResponse)
 	err := c.cc.Invoke(ctx, ControlPlane_NewServer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -634,7 +634,7 @@ type ControlPlaneServer interface {
 	ControlPing(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	SetTail(context.Context, *SetTailRequest) (*emptypb.Empty, error)
 	SetHead(context.Context, *SetHeadRequest) (*emptypb.Empty, error)
-	NewServer(context.Context, *NewServerRequest) (*emptypb.Empty, error)
+	NewServer(context.Context, *NewServerRequest) (*NewServerResponse, error)
 	SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error)
 	GetSubscriptionNode(context.Context, *SubscriptionNodeRequest) (*SubscriptionNodeResponse, error)
 	mustEmbedUnimplementedControlPlaneServer()
@@ -659,7 +659,7 @@ func (UnimplementedControlPlaneServer) SetTail(context.Context, *SetTailRequest)
 func (UnimplementedControlPlaneServer) SetHead(context.Context, *SetHeadRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetHead not implemented")
 }
-func (UnimplementedControlPlaneServer) NewServer(context.Context, *NewServerRequest) (*emptypb.Empty, error) {
+func (UnimplementedControlPlaneServer) NewServer(context.Context, *NewServerRequest) (*NewServerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method NewServer not implemented")
 }
 func (UnimplementedControlPlaneServer) SetNextServer(context.Context, *NextServerRequest) (*emptypb.Empty, error) {

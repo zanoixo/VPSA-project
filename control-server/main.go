@@ -52,6 +52,8 @@ func (controlServer *ControlServer) GetSubscriptionNode(ctx context.Context, req
 
 		currServer := controlServer.ServerChain
 
+		controlServer.nextSubServer %= controlServer.numOfServers
+
 		counter := 0
 
 		fmt.Printf("%d %d\n", controlServer.nextSubServer, controlServer.numOfServers)
@@ -67,7 +69,7 @@ func (controlServer *ControlServer) GetSubscriptionNode(ctx context.Context, req
 
 		_, err := controlServer.msgBoardClient.Ping(context.Background(), &emptypb.Empty{})
 
-		controlServer.nextSubServer = (controlServer.nextSubServer + 1) % controlServer.numOfServers
+		controlServer.nextSubServer = (controlServer.nextSubServer + 1)
 		if err == nil {
 
 			break
@@ -216,7 +218,7 @@ func (ControlServer *ControlServer) CheckWorkServers() {
 	}
 }
 
-func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewServerRequest) (*emptypb.Empty, error) {
+func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewServerRequest) (*db.NewServerResponse, error) {
 
 	ControlServer.chainLock.Lock()
 
@@ -227,6 +229,8 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 	newClient := db.NewControlPlaneClient(newConn)
 
 	checkError(err) //replace with retry logic
+
+	newServerResp := db.NewServerResponse{}
 
 	fmt.Printf("[INFO]: adding new server %s\n", req.NewServer.Address)
 
@@ -240,6 +244,8 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 		fmt.Printf("[INFO]: New tail request sent to server %s\n", req.NewServer.Address)
 		fmt.Printf("[INFO]: New head request sent to server %s\n", req.NewServer.Address)
+
+		newServerResp.SyncServer = &db.NodeInfo{Address: "", NodeId: ""}
 
 	} else {
 
@@ -256,6 +262,8 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 		fmt.Printf("[INFO]: New tail request sent to server %s\n", req.NewServer.Address)
 
 		tail.ControlClient.SetNextServer(context.Background(), &db.NextServerRequest{NextServer: req.NewServer})
+
+		newServerResp.SyncServer = &db.NodeInfo{Address: tail.url, NodeId: tail.nodeId}
 	}
 
 	ControlServer.ServersAlive[req.NewServer.NodeId] = 0
@@ -263,7 +271,7 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 	ControlServer.chainLock.Unlock()
 
-	return &emptypb.Empty{}, nil
+	return &newServerResp, nil
 }
 
 func startServer(url string) {

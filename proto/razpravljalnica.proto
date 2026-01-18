@@ -160,13 +160,16 @@ service ControlPlane {
 
   rpc SetHead(SetHeadRequest) returns (google.protobuf.Empty);
 
-  rpc NewServer(NewServerRequest) returns (google.protobuf.Empty);
+  rpc NewServer(NewServerRequest) returns (NewServerResponse);
 
   rpc SetNextServer(NextServerRequest) returns (google.protobuf.Empty);
 
   rpc GetSubscriptionNode(SubscriptionNodeRequest) returns (SubscriptionNodeResponse);
 }
 
+message NewServerResponse {
+  NodeInfo sync_server = 1;
+}
 message NextServerRequest {
   NodeInfo next_server = 1;
 }

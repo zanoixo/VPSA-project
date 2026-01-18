@@ -1134,7 +1134,63 @@ func (server *Server) newServer() {
 	time.Sleep(2 * time.Second)
 
 	newServerReq := &db.NewServerRequest{NewServer: &db.NodeInfo{Address: server.url, NodeId: server.nodeId}}
-	server.controlClient.NewServer(context.Background(), newServerReq)
+	newServerResp, err := server.controlClient.NewServer(context.Background(), newServerReq)
+
+	if err == nil {
+
+		if newServerResp.SyncServer.Address != "" {
+
+			syncConn, _ := grpc.NewClient(newServerResp.SyncServer.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			syncData := db.NewSyncDataClient(syncConn)
+
+			serverSyncData, err := syncData.SyncServer(context.Background(), &emptypb.Empty{})
+
+			if err == nil {
+
+				fmt.Printf("[INFO]: Recieved sync server response\n")
+
+				server.CRUDServer.userLock.Lock()
+				server.subNodeLock.Lock()
+				server.CRUDServer.topicLock.Lock()
+				server.CRUDServer.postLock.Lock()
+				server.CRUDServer.likesLock.Lock()
+
+				if serverSyncData.Users == nil {
+
+					server.CRUDServer.users = make(map[string]int64)
+				} else {
+
+					server.CRUDServer.users = serverSyncData.Users
+				}
+
+				server.CRUDServer.userIndex = serverSyncData.UserIndex
+
+				if serverSyncData.Topics == nil {
+
+					server.CRUDServer.topics = make(map[string]int64)
+				} else {
+
+					server.CRUDServer.topics = serverSyncData.Topics
+				}
+
+				server.CRUDServer.topicIndex = serverSyncData.TopicIndex
+
+				server.CRUDServer.topicsPosts = convertTopicsPostsReverse(serverSyncData.TopicsPosts)
+				server.CRUDServer.topicsPostsList = convertTopicsPostsListReverse(serverSyncData.TopicsPostsList)
+				server.CRUDServer.postIndex = serverSyncData.PostIndex
+
+				server.CRUDServer.userLikes = convertUserLikesReverse(serverSyncData.UserLikes)
+
+				server.CRUDServer.likesLock.Unlock()
+				server.CRUDServer.postLock.Unlock()
+				server.CRUDServer.topicLock.Unlock()
+				server.subNodeLock.Unlock()
+				server.CRUDServer.userLock.Unlock()
+
+			}
+		}
+	}
+
 }
 
 func startServer(ip string, port int, nodeId string, controlUrl string) {
