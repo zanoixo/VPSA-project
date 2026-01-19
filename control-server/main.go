@@ -50,13 +50,13 @@ func (controlServer *ControlServer) GetSubscriptionNode(ctx context.Context, req
 
 	for {
 
+		controlServer.chainLock.Lock()
+
 		currServer := controlServer.ServerChain
 
 		controlServer.nextSubServer %= controlServer.numOfServers
 
 		counter := 0
-
-		fmt.Printf("%d %d\n", controlServer.nextSubServer, controlServer.numOfServers)
 
 		for counter != controlServer.nextSubServer {
 
@@ -66,6 +66,8 @@ func (controlServer *ControlServer) GetSubscriptionNode(ctx context.Context, req
 
 		nextSubConn, _ := grpc.NewClient(currServer.url, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		controlServer.msgBoardClient = db.NewMessageBoardClient(nextSubConn)
+
+		controlServer.chainLock.Unlock()
 
 		_, err := controlServer.msgBoardClient.Ping(context.Background(), &emptypb.Empty{})
 
@@ -111,8 +113,12 @@ func (ControlServer *ControlServer) GetClusterState(ctx context.Context, _ *empt
 
 	fmt.Printf("[INFO]: New cluster state request recieved\n")
 
+	ControlServer.chainLock.Lock()
+
 	head := ControlServer.GetHead()
 	tail := ControlServer.GetTail()
+
+	ControlServer.chainLock.Unlock()
 
 	clusterStateRes := db.GetClusterStateResponse{}
 
