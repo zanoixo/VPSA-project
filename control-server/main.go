@@ -230,6 +230,7 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 	if err != nil {
 
+		ControlServer.chainLock.Unlock()
 		return nil, status.Error(codes.DataLoss, "Can't connect to server")
 	}
 
