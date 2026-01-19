@@ -228,7 +228,10 @@ func (ControlServer *ControlServer) NewServer(ctx context.Context, req *db.NewSe
 
 	newClient := db.NewControlPlaneClient(newConn)
 
-	checkError(err) //replace with retry logic
+	if err != nil {
+
+		return nil, status.Error(codes.DataLoss, "Can't connect to server")
+	}
 
 	newServerResp := db.NewServerResponse{}
 

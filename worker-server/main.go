@@ -70,6 +70,10 @@ type ServerDataBase struct {
 
 	userSubscription     map[string][]*SubscriptionData
 	userSubscriptionLock sync.Mutex
+
+	syncMap   map[int64]int64
+	syncIndex int64
+	syncLock  sync.Mutex
 }
 
 func (server *Server) Ping(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
@@ -119,6 +123,21 @@ func (server *Server) SyncUser(ctx context.Context, req *db.SyncUserRequest) (*e
 
 	fmt.Printf("[INFO]: Syncing create user request from %s with id: %d\n", req.Name, req.Id)
 
+	server.CRUDServer.syncLock.Lock()
+
+	_, syncExists := server.CRUDServer.syncMap[req.SyncNum]
+
+	if syncExists {
+
+		server.CRUDServer.syncLock.Unlock()
+		return nil, nil
+	}
+
+	server.CRUDServer.syncMap[req.SyncNum] = 1
+	server.CRUDServer.syncIndex = max(req.SyncNum, server.CRUDServer.syncIndex)
+
+	server.CRUDServer.syncLock.Unlock()
+
 	server.CRUDServer.userLock.Lock()
 
 	server.CRUDServer.users[req.Name] = req.Id
@@ -158,6 +177,21 @@ func (server *Server) SyncTopic(ctx context.Context, req *db.SyncTopicRequest) (
 
 	fmt.Printf("[INFO]: Recieved sync topic request: %s with id %d\n", req.Name, req.Id)
 
+	server.CRUDServer.syncLock.Lock()
+
+	_, syncExists := server.CRUDServer.syncMap[req.SyncNum]
+
+	if syncExists {
+
+		server.CRUDServer.syncLock.Unlock()
+		return nil, nil
+	}
+
+	server.CRUDServer.syncMap[req.SyncNum] = 1
+	server.CRUDServer.syncIndex = max(req.SyncNum, server.CRUDServer.syncIndex)
+
+	server.CRUDServer.syncLock.Unlock()
+
 	server.CRUDServer.topicLock.Lock()
 	server.CRUDServer.postLock.Lock()
 
@@ -194,6 +228,21 @@ func (server *Server) SyncTopic(ctx context.Context, req *db.SyncTopicRequest) (
 func (server *Server) SyncLike(ctx context.Context, req *db.SyncLikeRequest) (*emptypb.Empty, error) {
 
 	fmt.Printf("[INFO]: Recieved sync like request: with user id: %d topicId: %d msgId: %d\n", req.UserId, req.TopicId, req.MessageId)
+
+	server.CRUDServer.syncLock.Lock()
+
+	_, syncExists := server.CRUDServer.syncMap[req.SyncNum]
+
+	if syncExists {
+
+		server.CRUDServer.syncLock.Unlock()
+		return nil, nil
+	}
+
+	server.CRUDServer.syncMap[req.SyncNum] = 1
+	server.CRUDServer.syncIndex = max(req.SyncNum, server.CRUDServer.syncIndex)
+
+	server.CRUDServer.syncLock.Unlock()
 
 	server.CRUDServer.postLock.Lock()
 	server.CRUDServer.likesLock.Lock()
@@ -262,6 +311,21 @@ func (server *Server) SyncLike(ctx context.Context, req *db.SyncLikeRequest) (*e
 func (server *Server) SyncMessage(ctx context.Context, req *db.SyncMessageRequest) (*emptypb.Empty, error) {
 
 	fmt.Printf("[INFO]: Recieved sync post request with topicId: %d postId: %d\n", req.TopicId, req.PostId)
+
+	server.CRUDServer.syncLock.Lock()
+
+	_, syncExists := server.CRUDServer.syncMap[req.SyncNum]
+
+	if syncExists {
+
+		server.CRUDServer.syncLock.Unlock()
+		return nil, nil
+	}
+
+	server.CRUDServer.syncMap[req.SyncNum] = 1
+	server.CRUDServer.syncIndex = max(req.SyncNum, server.CRUDServer.syncIndex)
+
+	server.CRUDServer.syncLock.Unlock()
 
 	server.CRUDServer.postLock.Lock()
 
@@ -415,6 +479,13 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 	currUser := db.User{}
 	currUser.Name = req.Name
 
+	server.CRUDServer.syncLock.Lock()
+
+	syncNum := server.CRUDServer.syncIndex
+	server.CRUDServer.syncIndex++
+
+	server.CRUDServer.syncLock.Unlock()
+
 	server.CRUDServer.userLock.Lock()
 
 	userId, userExists := server.CRUDServer.users[req.Name]
@@ -441,7 +512,7 @@ func (server *Server) CreateUser(ctx context.Context, req *db.CreateUserRequest)
 
 		for {
 
-			syncReq := &db.SyncUserRequest{Id: currUser.Id, Name: req.Name}
+			syncReq := &db.SyncUserRequest{Id: currUser.Id, Name: req.Name, SyncNum: syncNum}
 
 			_, err := server.syncDataService.SyncUser(context.Background(), syncReq)
 
@@ -472,6 +543,13 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 	newTopic := db.Topic{}
 	newTopic.Name = req.Name
 
+	server.CRUDServer.syncLock.Lock()
+
+	syncNum := server.CRUDServer.syncIndex
+	server.CRUDServer.syncIndex++
+
+	server.CRUDServer.syncLock.Unlock()
+
 	server.CRUDServer.topicLock.Lock()
 
 	topicId, topicExists := server.CRUDServer.topics[req.Name]
@@ -501,7 +579,7 @@ func (server *Server) CreateTopic(ctx context.Context, req *db.CreateTopicReques
 
 	if !server.isTail {
 
-		syncReq := &db.SyncTopicRequest{Id: newTopic.Id, Name: req.Name}
+		syncReq := &db.SyncTopicRequest{Id: newTopic.Id, Name: req.Name, SyncNum: syncNum}
 
 		for {
 
@@ -536,6 +614,13 @@ func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageReques
 	newPost.TopicId = req.TopicId
 	newPost.Likes = 0
 
+	server.CRUDServer.syncLock.Lock()
+
+	syncNum := server.CRUDServer.syncIndex
+	server.CRUDServer.syncIndex++
+
+	server.CRUDServer.syncLock.Unlock()
+
 	server.CRUDServer.postLock.Lock()
 
 	_, topicExists := server.CRUDServer.topicsPosts[req.TopicId]
@@ -556,7 +641,7 @@ func (server *Server) PostMessage(ctx context.Context, req *db.PostMessageReques
 
 	if !server.isTail {
 
-		syncReq := &db.SyncMessageRequest{TopicId: req.TopicId, PostId: newPost.Id, Post: newPost}
+		syncReq := &db.SyncMessageRequest{TopicId: req.TopicId, PostId: newPost.Id, Post: newPost, SyncNum: syncNum}
 
 		for {
 
@@ -612,6 +697,13 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 		return nil, status.Error(codes.PermissionDenied, "Can't request to like a message on a server that isn't the head server")
 	}
 
+	server.CRUDServer.syncLock.Lock()
+
+	syncNum := server.CRUDServer.syncIndex
+	server.CRUDServer.syncIndex++
+
+	server.CRUDServer.syncLock.Unlock()
+
 	if server.userExists(req.UserId) == "" {
 
 		fmt.Printf("[INFO]: User doesnt exist\n")
@@ -650,7 +742,7 @@ func (server *Server) LikeMessage(ctx context.Context, req *db.LikeMessageReques
 
 	if !server.isTail {
 
-		syncReq := &db.SyncLikeRequest{MessageId: req.MessageId, UserId: req.UserId, TopicId: req.TopicId}
+		syncReq := &db.SyncLikeRequest{MessageId: req.MessageId, UserId: req.UserId, TopicId: req.TopicId, SyncNum: syncNum}
 
 		for {
 			_, err := server.syncDataService.SyncLike(context.Background(), syncReq)
@@ -1211,6 +1303,9 @@ func startServer(ip string, port int, nodeId string, controlUrl string) {
 	CRUD.userLikes = make(map[int64][]int64)
 
 	CRUD.userSubscription = make(map[string][]*SubscriptionData)
+
+	CRUD.syncMap = make(map[int64]int64)
+	CRUD.syncIndex = 0
 
 	fmt.Printf("Server starting: %s\n", currUrl)
 	grpcServer := grpc.NewServer()

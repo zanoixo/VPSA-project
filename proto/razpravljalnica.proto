@@ -212,17 +212,20 @@ service syncData {
 message SyncUserRequest {
   int64  id = 1;
   string name = 2;
+  int64 sync_num = 3;
 }
 
 message SyncTopicRequest {
   int64 id = 1;
   string name = 2;
+  int64 sync_num = 3;
 }
 
 message SyncMessageRequest {
   int64 topic_id = 1;
   int64 post_id = 2;
   Message post = 3;
+  int64 sync_num = 4;
   
 }
 
@@ -230,6 +233,7 @@ message SyncLikeRequest {
   int64 message_id = 1;
   int64 user_id = 2;
   int64 topic_id = 3;
+  int64 sync_num = 4;
 }
 
 message TopicPosts {
@@ -274,4 +278,5 @@ message SyncServerResponse {
   repeated UserLikes user_likes = 8;
 
   repeated UserSubscriptions user_subscriptions = 9;
+  int64 sync_num = 10;
 }
